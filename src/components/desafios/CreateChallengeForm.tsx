@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
+import { WEEKDAY_LABELS_PT } from "@/lib/dates";
+
+const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
 export function CreateChallengeForm() {
   const [state, formAction, pending] = useActionState(createChallenge, undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [coverColor, setCoverColor] = useState<string | null>(null);
+  const [weekdays, setWeekdays] = useState<number[]>(ALL_WEEKDAYS);
+  const [isPublic, setIsPublic] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   // This form stays mounted after a successful submit (unlike the check-in
@@ -33,6 +38,8 @@ export function CreateChallengeForm() {
     if (state?.success) {
       setPreviewUrl(null);
       setCoverColor(null);
+      setWeekdays(ALL_WEEKDAYS);
+      setIsPublic(false);
     }
   }
 
@@ -115,8 +122,81 @@ export function CreateChallengeForm() {
         />
 
         <div>
+          <Label htmlFor="startDate">Começa em (opcional)</Label>
+          <Input id="startDate" name="startDate" type="date" error={state?.errors?.startDate?.[0]} />
+        </div>
+        <div>
           <Label htmlFor="endDate">Termina em (opcional)</Label>
           <Input id="endDate" name="endDate" type="date" error={state?.errors?.endDate?.[0]} />
+        </div>
+
+        <div>
+          <Label>Vale nos dias</Label>
+          <div className="flex gap-1">
+            {WEEKDAY_LABELS_PT.map((label, day) => (
+              <button
+                key={day}
+                type="button"
+                aria-pressed={weekdays.includes(day)}
+                aria-label={`Alternar ${label}`}
+                onClick={() =>
+                  setWeekdays((current) =>
+                    current.includes(day)
+                      ? current.filter((d) => d !== day)
+                      : [...current, day].sort()
+                  )
+                }
+                className={cn(
+                  "h-7 w-7 shrink-0 rounded-full text-[11px] font-bold transition-colors",
+                  weekdays.includes(day)
+                    ? "bg-accent text-accent-ink"
+                    : "bg-white/5 text-white/40 hover:bg-white/10"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {weekdays.map((day) => (
+            <input key={day} type="hidden" name="weekdays" value={day} />
+          ))}
+          {state?.errors?.weekdays?.[0] && (
+            <p className="mt-1.5 text-[11px] text-red-400">{state.errors.weekdays[0]}</p>
+          )}
+        </div>
+
+        <div>
+          <Label>Visibilidade</Label>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              aria-pressed={!isPublic}
+              onClick={() => setIsPublic(false)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors",
+                !isPublic ? "bg-accent text-accent-ink" : "bg-white/5 text-white/40 hover:bg-white/10"
+              )}
+            >
+              Privado
+            </button>
+            <button
+              type="button"
+              aria-pressed={isPublic}
+              onClick={() => setIsPublic(true)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors",
+                isPublic ? "bg-accent text-accent-ink" : "bg-white/5 text-white/40 hover:bg-white/10"
+              )}
+            >
+              Público
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] text-white/35">
+            {isPublic
+              ? "O código de convite fica visível pra qualquer membro."
+              : "O código de convite fica visível só pra você (dono/admins)."}
+          </p>
+          <input type="hidden" name="isPublic" value={isPublic ? "on" : ""} />
         </div>
 
         {state?.message && (

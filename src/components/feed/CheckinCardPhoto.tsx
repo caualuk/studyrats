@@ -38,7 +38,7 @@ export function CheckinCardPhoto({ checkin }: { checkin: FeedCheckin }) {
           className="h-[150px] w-full"
         >
           <Badge className="absolute bottom-2.5 left-2.5">{checkin.tag}</Badge>
-          {checkin.isOwner && <CheckinCardActions checkin={checkin} />}
+          {checkin.canDelete && <CheckinCardActions checkin={checkin} />}
         </PhotoPlaceholder>
       </div>
 

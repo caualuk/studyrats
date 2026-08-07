@@ -18,8 +18,8 @@ export function ChallengeCard({ challenge }: { challenge: MyChallengeCard }) {
           <div className="mb-1.5 text-sm font-bold">{challenge.name}</div>
           <div className="flex justify-between text-[11px] text-white/45">
             <span>
-              👥 {challenge.memberCount} {challenge.memberCount === 1 ? "membro" : "membros"} ·
-              código {challenge.code}
+              👥 {challenge.memberCount} {challenge.memberCount === 1 ? "membro" : "membros"}
+              {challenge.code && ` · código ${challenge.code}`}
             </span>
             {challenge.daysLeft !== null && (
               <span className="shrink-0 text-accent">

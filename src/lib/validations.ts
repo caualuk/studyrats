@@ -37,18 +37,25 @@ export const LoginSchema = z.object({
 
 export type LoginInput = z.infer<typeof LoginSchema>;
 
-export const CheckinSchema = z.object({
+// Which challenge (if any) a check-in belongs to is chosen when *starting*
+// it (see startCheckin) -- by check-out time that's already fixed, so this
+// only covers the fields check-out actually collects.
+export const CheckoutSchema = z.object({
   title: z.string().trim().min(2, { error: "Dê um título para o check-in." }).max(80),
   description: z.string().trim().max(400).optional().or(z.literal("")),
-  challengeId: z.string().trim().optional().or(z.literal("")),
 });
 
-export type CheckinInput = z.infer<typeof CheckinSchema>;
+export type CheckoutInput = z.infer<typeof CheckoutSchema>;
 
 export const ChallengeCreateSchema = z.object({
   name: z.string().trim().min(3, { error: "Dê um nome para o desafio." }).max(60),
   description: z.string().trim().max(300).optional().or(z.literal("")),
+  startDate: z.string().trim().optional().or(z.literal("")),
   endDate: z.string().trim().optional().or(z.literal("")),
+  // Which weekdays (0=Sunday..6=Saturday) count for this challenge --
+  // checkbox values, so a plain string array rather than a number one.
+  // Falls back to every day if left empty, see createChallenge.
+  weekdays: z.array(z.string()).optional(),
   coverColor: z
     .string()
     .trim()

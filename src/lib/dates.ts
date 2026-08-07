@@ -14,6 +14,7 @@ const MONTH_NAMES_PT = [
 ];
 
 export const WEEKDAY_LABELS_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
+export const WEEKDAY_SHORT_PT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 export function formatDatePtBR(date: Date): string {
   return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
@@ -191,4 +192,14 @@ export function startOfDay(date: Date = new Date()): Date {
 /** Start of the current calendar month, day 1 at 00:00. */
 export function startOfMonth(date: Date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+/** "12min" below an hour, "2h 30" once it crosses one, "1h" exactly on the hour -- for the live check-in timer. */
+export function formatElapsed(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}min`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${String(minutes).padStart(2, "0")}`;
 }

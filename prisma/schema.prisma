@@ -93,9 +93,18 @@ model FriendInvite {
 
 model Checkin {
   id          String   @id @default(cuid())
-  title       String
+  // Null until check-out: a check-in starts with just userId/challengeId/
+  // createdAt, and title/description/photoUrl are only filled in (together,
+  // atomically) when the session is checked out -- see checkOutCheckin.
+  title       String?
   description String?
-  photoUrl    String
+  photoUrl    String?
+  // Null while the session is in progress. Set the moment check-out
+  // completes -- this is what "counts" the check-in everywhere (feed,
+  // profile, ranking, streaks all filter on checkedOutAt != null), matching
+  // "sem foto não conta": an unfinished session was never proven, so it
+  // never shows up.
+  checkedOutAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -183,6 +192,9 @@ model Challenge {
   coverColor  String?
   code        String    @unique
   isPublic    Boolean   @default(false)
+  // Which weekdays this challenge counts for, 0=Sunday..6=Saturday (same
+  // convention as WEEKDAY_LABELS_PT/Date#getDay()). Defaults to every day.
+  weekdays    Int[]     @default([0, 1, 2, 3, 4, 5, 6])
   startDate   DateTime  @default(now())
   endDate     DateTime?
   createdAt   DateTime  @default(now())

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
-import { NewCheckinDialog } from "@/components/checkins/NewCheckinDialog";
 import { EditChallengeDialog } from "@/components/desafios/EditChallengeDialog";
+import { WEEKDAY_SHORT_PT } from "@/lib/dates";
 import type { ChallengeDetail } from "@/lib/challenges/queries";
 
 export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetail }) {
@@ -22,11 +22,6 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h1 className="text-[32px] font-extrabold">{challenge.name}</h1>
         <div className="flex items-center gap-2">
-          <NewCheckinDialog
-            lockedChallenge={{ id: challenge.id, name: challenge.name }}
-            label="Check-in"
-            variant="primary"
-          />
           {challenge.canManage && (
             <EditChallengeDialog
               challengeId={challenge.id}
@@ -45,7 +40,13 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
         <span>
           👥 {challenge.memberCount} {challenge.memberCount === 1 ? "membro" : "membros"}
         </span>
-        <span>código {challenge.code}</span>
+        {challenge.weekdays.length < 7 && (
+          <span>
+            vale {challenge.weekdays.map((d) => WEEKDAY_SHORT_PT[d]).join(", ")}
+          </span>
+        )}
+        {/* Private challenges only reveal the invite code to whoever can manage the challenge (getChallengeDetail already returns null otherwise) -- a regular member has to ask the owner/admin for it instead of being able to pass it along themselves. */}
+        {challenge.code && <span>código {challenge.code}</span>}
         {challenge.daysLeft !== null && (
           <span className="text-accent">
             {challenge.daysLeft > 0 ? `${challenge.daysLeft} dias restantes` : "Encerrado"}

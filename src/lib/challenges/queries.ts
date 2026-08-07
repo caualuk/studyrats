@@ -23,7 +23,8 @@ export type MyChallengeCard = {
   name: string;
   coverUrl: string | null;
   coverColor: string | null;
-  code: string;
+  /** Null when private and the viewer isn't owner/admin -- see canShowCode below. */
+  code: string | null;
   memberCount: number;
   daysLeft: number | null;
   isOwner: boolean;
@@ -34,6 +35,7 @@ export async function getMyChallenges(userId: string): Promise<MyChallengeCard[]
     where: { userId },
     orderBy: { joinedAt: "desc" },
     select: {
+      isAdmin: true,
       challenge: {
         select: {
           id: true,
@@ -41,6 +43,7 @@ export async function getMyChallenges(userId: string): Promise<MyChallengeCard[]
           coverUrl: true,
           coverColor: true,
           code: true,
+          isPublic: true,
           ownerId: true,
           endDate: true,
           _count: { select: { members: true } },
@@ -50,16 +53,20 @@ export async function getMyChallenges(userId: string): Promise<MyChallengeCard[]
   });
 
   const now = new Date();
-  return memberships.map(({ challenge: c }) => ({
-    id: c.id,
-    name: c.name,
-    coverUrl: c.coverUrl,
-    coverColor: c.coverColor,
-    code: c.code,
-    memberCount: c._count.members,
-    daysLeft: c.endDate ? daysBetween(now, c.endDate) : null,
-    isOwner: c.ownerId === userId,
-  }));
+  return memberships.map(({ isAdmin, challenge: c }) => {
+    const isOwner = c.ownerId === userId;
+    const canShowCode = c.isPublic || isOwner || isAdmin;
+    return {
+      id: c.id,
+      name: c.name,
+      coverUrl: c.coverUrl,
+      coverColor: c.coverColor,
+      code: canShowCode ? c.code : null,
+      memberCount: c._count.members,
+      daysLeft: c.endDate ? daysBetween(now, c.endDate) : null,
+      isOwner,
+    };
+  });
 }
 
 export type ChallengeDetail = {
@@ -68,7 +75,10 @@ export type ChallengeDetail = {
   description: string | null;
   coverUrl: string | null;
   coverColor: string | null;
-  code: string;
+  /** Null when private and the viewer isn't owner/admin -- never sent to the client at all in that case, not just hidden in the UI. */
+  code: string | null;
+  isPublic: boolean;
+  weekdays: number[];
   startDate: Date;
   endDate: Date | null;
   daysLeft: number | null;
@@ -101,6 +111,8 @@ export async function getChallengeDetail(
           coverUrl: true,
           coverColor: true,
           code: true,
+          isPublic: true,
+          weekdays: true,
           startDate: true,
           endDate: true,
           ownerId: true,
@@ -113,20 +125,23 @@ export async function getChallengeDetail(
 
   const c = membership.challenge;
   const isOwner = c.ownerId === userId;
+  const canManage = isOwner || membership.isAdmin;
   return {
     id: c.id,
     name: c.name,
     description: c.description,
     coverUrl: c.coverUrl,
     coverColor: c.coverColor,
-    code: c.code,
+    code: c.isPublic || canManage ? c.code : null,
+    isPublic: c.isPublic,
+    weekdays: c.weekdays,
     startDate: c.startDate,
     endDate: c.endDate,
     daysLeft: c.endDate ? daysBetween(new Date(), c.endDate) : null,
     memberCount: c._count.members,
     isOwner,
     isAdmin: membership.isAdmin,
-    canManage: isOwner || membership.isAdmin,
+    canManage,
   };
 }
 
@@ -148,6 +163,23 @@ export async function canManageChallenge(challengeId: string, userId: string): P
     select: { isAdmin: true },
   });
   return membership?.isAdmin ?? false;
+}
+
+/**
+ * Every challenge `userId` can moderate (owns, or is admin of) -- fetched
+ * as a batch so a list of check-ins from many different challenges (the
+ * global feed, a profile's activity) can each be checked with a Set lookup
+ * instead of one canManageChallenge() query per check-in.
+ */
+export async function getManagedChallengeIds(userId: string): Promise<Set<string>> {
+  const [owned, adminOf] = await Promise.all([
+    prisma.challenge.findMany({ where: { ownerId: userId }, select: { id: true } }),
+    prisma.challengeMember.findMany({
+      where: { userId, isAdmin: true },
+      select: { challengeId: true },
+    }),
+  ]);
+  return new Set([...owned.map((c) => c.id), ...adminOf.map((m) => m.challengeId)]);
 }
 
 export type ChallengeMemberRow = {
@@ -176,7 +208,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
     prisma.challenge.findUnique({ where: { id: challengeId }, select: { ownerId: true } }),
     prisma.checkin.groupBy({
       by: ["userId"],
-      where: { challengeId },
+      where: { challengeId, checkedOutAt: { not: null } },
       _count: { id: true },
     }),
   ]);

@@ -29,7 +29,7 @@ export async function getRanking(period: RankingPeriod, limit = 10): Promise<Ran
 
   const grouped = await prisma.checkin.groupBy({
     by: ["userId"],
-    where: { createdAt: { gte: since } },
+    where: { createdAt: { gte: since }, checkedOutAt: { not: null } },
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
     take: limit,

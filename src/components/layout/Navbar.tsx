@@ -2,10 +2,8 @@ import Link from "next/link";
 import { logout } from "@/lib/auth/actions";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { NavTabs } from "@/components/layout/NavTabs";
-import { NewCheckinDialog } from "@/components/checkins/NewCheckinDialog";
-import type { ChallengeOption } from "@/lib/challenges/queries";
 
-export function Navbar({ challenges }: { challenges: ChallengeOption[] }) {
+export function Navbar() {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/90 px-8 py-3.5 backdrop-blur-sm">
       <Link href="/feed">
@@ -15,7 +13,6 @@ export function Navbar({ challenges }: { challenges: ChallengeOption[] }) {
       <NavTabs />
 
       <div className="flex items-center gap-5">
-        <NewCheckinDialog challenges={challenges} label="Check-in" variant="primary" />
         <form action={logout}>
           <button
             type="submit"

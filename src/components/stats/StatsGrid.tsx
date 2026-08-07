@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 
-export type Stat = { value: string | number; label: string };
+export type Stat = { value: ReactNode; label: string };
 
 export function StatsGrid({
   stats,

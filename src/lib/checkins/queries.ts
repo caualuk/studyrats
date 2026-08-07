@@ -1,7 +1,11 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { formatDatePtBR, fromDateKey } from "@/lib/dates";
+import { formatDatePtBR, fromDateKey, startOfMonth } from "@/lib/dates";
+import { getManagedChallengeIds } from "@/lib/challenges/queries";
+
+/** Every completed-checkin query filters on this -- an in-progress session (no checkedOutAt) never "counts" anywhere. */
+const COMPLETED: Prisma.CheckinWhereInput = { checkedOutAt: { not: null } };
 
 export type FeedCheckin = {
   id: string;
@@ -18,8 +22,10 @@ export type FeedCheckin = {
   likesCount: number;
   commentsCount: number;
   likedByMe: boolean;
-  /** Whether the viewer is the author -- gates the edit/delete controls. */
+  /** Whether the viewer is the author -- gates the edit control (and, together with canDelete, the delete control). */
   isOwner: boolean;
+  /** Author, or an owner/admin of the challenge this check-in was posted under -- gates the delete control. */
+  canDelete: boolean;
 };
 
 function feedCheckinInclude(currentUserId: string) {
@@ -37,12 +43,20 @@ type CheckinWithRelations = Prisma.CheckinGetPayload<{
   include: ReturnType<typeof feedCheckinInclude>;
 }>;
 
-function toFeedCheckin(c: CheckinWithRelations, currentUserId: string): FeedCheckin {
+function toFeedCheckin(
+  c: CheckinWithRelations,
+  currentUserId: string,
+  managedChallengeIds: Set<string>
+): FeedCheckin {
+  const isOwner = c.userId === currentUserId;
   return {
     id: c.id,
-    title: c.title,
+    // Non-null: every caller here queries with the COMPLETED filter, and
+    // title/photoUrl are only ever null before check-out (see checkOutCheckin,
+    // which sets both together with checkedOutAt in the same update).
+    title: c.title!,
     description: c.description,
-    photoUrl: c.photoUrl,
+    photoUrl: c.photoUrl!,
     tag: c.challenge?.name ?? "Check-in livre",
     authorId: c.userId,
     authorName: c.user.name,
@@ -53,21 +67,51 @@ function toFeedCheckin(c: CheckinWithRelations, currentUserId: string): FeedChec
     likesCount: c._count.likes,
     commentsCount: c._count.comments,
     likedByMe: c.likes.length > 0,
-    isOwner: c.userId === currentUserId,
+    isOwner,
+    canDelete: isOwner || (c.challengeId != null && managedChallengeIds.has(c.challengeId)),
   };
 }
 
+/**
+ * The Feed shows only friends' check-ins -- not the viewer's own, and
+ * nothing at all if they have no friends yet. A friend's check-in under a
+ * challenge additionally only shows if the *viewer* also participates in
+ * that challenge (posting in a challenge someone isn't part of shouldn't
+ * leak into their friends' feeds just because they're friends with a
+ * member).
+ */
 export async function getFeedCheckins(
   currentUserId: string,
   limit = 30
 ): Promise<FeedCheckin[]> {
-  const checkins = await prisma.checkin.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    include: feedCheckinInclude(currentUserId),
+  const friendships = await prisma.friendship.findMany({
+    where: { userId: currentUserId },
+    select: { friendId: true },
   });
+  const friendIds = friendships.map((f) => f.friendId);
+  if (friendIds.length === 0) return [];
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId));
+  const myMemberships = await prisma.challengeMember.findMany({
+    where: { userId: currentUserId },
+    select: { challengeId: true },
+  });
+  const myChallengeIds = myMemberships.map((m) => m.challengeId);
+
+  const [checkins, managedChallengeIds] = await Promise.all([
+    prisma.checkin.findMany({
+      where: {
+        ...COMPLETED,
+        userId: { in: friendIds },
+        OR: [{ challengeId: null }, { challengeId: { in: myChallengeIds } }],
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: feedCheckinInclude(currentUserId),
+    }),
+    getManagedChallengeIds(currentUserId),
+  ]);
+
+  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds));
 }
 
 /**
@@ -95,13 +139,16 @@ export async function getUserCheckins(
   userId: string,
   viewerId: string = userId
 ): Promise<FeedCheckin[]> {
-  const checkins = await prisma.checkin.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    include: feedCheckinInclude(viewerId),
-  });
+  const [checkins, managedChallengeIds] = await Promise.all([
+    prisma.checkin.findMany({
+      where: { userId, ...COMPLETED },
+      orderBy: { createdAt: "desc" },
+      include: feedCheckinInclude(viewerId),
+    }),
+    getManagedChallengeIds(viewerId),
+  ]);
 
-  return checkins.map((c) => toFeedCheckin(c, viewerId));
+  return checkins.map((c) => toFeedCheckin(c, viewerId, managedChallengeIds));
 }
 
 /**
@@ -115,7 +162,7 @@ export async function getChallengeCheckinDatesByMember(
   challengeId: string
 ): Promise<Map<string, Date[]>> {
   const rows = await prisma.checkin.findMany({
-    where: { challengeId },
+    where: { challengeId, ...COMPLETED },
     select: { userId: true, createdAt: true },
   });
 
@@ -134,12 +181,52 @@ export async function getChallengeCheckins(
   currentUserId: string,
   limit = 60
 ): Promise<FeedCheckin[]> {
-  const checkins = await prisma.checkin.findMany({
-    where: { challengeId },
+  const [checkins, managedChallengeIds] = await Promise.all([
+    prisma.checkin.findMany({
+      where: { challengeId, ...COMPLETED },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: feedCheckinInclude(currentUserId),
+    }),
+    getManagedChallengeIds(currentUserId),
+  ]);
+
+  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds));
+}
+
+export type ActiveCheckin = {
+  id: string;
+  createdAt: Date;
+  challengeId: string | null;
+  challengeName: string | null;
+};
+
+/** The user's in-progress check-in (started, not yet checked out), if any -- drives the Feed banner's timer/"Finalizar" state. At most one at a time, see startCheckin. */
+export async function getActiveCheckin(userId: string): Promise<ActiveCheckin | null> {
+  const checkin = await prisma.checkin.findFirst({
+    where: { userId, checkedOutAt: null },
     orderBy: { createdAt: "desc" },
-    take: limit,
-    include: feedCheckinInclude(currentUserId),
+    select: { id: true, createdAt: true, challengeId: true, challenge: { select: { name: true } } },
+  });
+  if (!checkin) return null;
+  return {
+    id: checkin.id,
+    createdAt: checkin.createdAt,
+    challengeId: checkin.challengeId,
+    challengeName: checkin.challenge?.name ?? null,
+  };
+}
+
+/** Total hours studied this calendar month, summed from completed check-ins' check-in-to-check-out duration. Drives the profile's "Este mês" stat. */
+export async function getStudyHoursThisMonth(userId: string): Promise<number> {
+  const rows = await prisma.checkin.findMany({
+    where: { userId, checkedOutAt: { not: null, gte: startOfMonth() } },
+    select: { createdAt: true, checkedOutAt: true },
   });
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId));
+  const totalMs = rows.reduce(
+    (sum, r) => sum + (r.checkedOutAt!.getTime() - r.createdAt.getTime()),
+    0
+  );
+  return totalMs / (1000 * 60 * 60);
 }

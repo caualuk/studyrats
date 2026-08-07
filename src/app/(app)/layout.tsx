@@ -1,15 +1,13 @@
 import type { ReactNode } from "react";
-import { getCurrentUser } from "@/lib/auth/dal";
-import { getMyChallengeOptions } from "@/lib/challenges/queries";
+import { verifySession } from "@/lib/auth/dal";
 import { Navbar } from "@/components/layout/Navbar";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const user = await getCurrentUser();
-  const challenges = await getMyChallengeOptions(user.id);
+  await verifySession();
 
   return (
     <div className="min-h-screen">
-      <Navbar challenges={challenges} />
+      <Navbar />
       <main>{children}</main>
     </div>
   );

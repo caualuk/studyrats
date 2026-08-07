@@ -39,7 +39,9 @@ export async function createChallenge(_prevState: FormState, formData: FormData)
   const validated = ChallengeCreateSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description"),
+    startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
+    weekdays: formData.getAll("weekdays"),
     coverColor: formData.get("coverColor"),
   });
 
@@ -47,7 +49,11 @@ export async function createChallenge(_prevState: FormState, formData: FormData)
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
 
-  const { name, description, endDate, coverColor } = validated.data;
+  const { name, description, startDate, endDate, weekdays, coverColor } = validated.data;
+  // An empty selection would make the challenge impossible to ever
+  // complete a day for, so it falls back to every day rather than none.
+  const weekdayNumbers = weekdays && weekdays.length > 0 ? weekdays.map(Number) : [0, 1, 2, 3, 4, 5, 6];
+  const isPublic = formData.get("isPublic") === "on";
 
   let coverUrl: string | null = null;
   const cover = formData.get("cover");
@@ -69,6 +75,9 @@ export async function createChallenge(_prevState: FormState, formData: FormData)
         coverUrl,
         coverColor: coverColor || null,
         code,
+        isPublic,
+        weekdays: weekdayNumbers,
+        startDate: startDate ? new Date(startDate) : new Date(),
         endDate: endDate ? new Date(endDate) : null,
         ownerId: session.userId,
         members: { create: { userId: session.userId } },
