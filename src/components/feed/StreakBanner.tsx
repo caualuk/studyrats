@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { cancelCheckin, startCheckin } from "@/lib/checkins/actions";
+import Link from "next/link";
+import { startCheckin } from "@/lib/checkins/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { CheckOutDialog } from "@/components/checkins/CheckOutDialog";
-import { CheckoutSuccessModal } from "@/components/checkins/CheckoutSuccessModal";
 import { formatElapsed } from "@/lib/dates";
-import type { ChallengeOption } from "@/lib/challenges/queries";
 import type { ActiveCheckin } from "@/lib/checkins/queries";
 import type { StreakStatus } from "@/lib/dates";
 
@@ -32,40 +30,23 @@ function StreakLabel({ status }: { status: StreakStatus }) {
   return <span className="text-sm text-white/50">Você não tem sequência</span>;
 }
 
+/**
+ * Check-in/check-out itself lives entirely on the /cronometro page now (see
+ * CronometerView) -- this banner only starts a session and links there,
+ * both when idle (creates one first) and when one's already running.
+ */
 export function StreakBanner({
   status,
-  challenges,
   activeCheckin,
 }: {
   status: StreakStatus;
-  challenges: ChallengeOption[];
   activeCheckin: ActiveCheckin | null;
 }) {
-  // Lives here, not inside ActiveSession/CheckOutDialog: once check-out
-  // succeeds, `activeCheckin` becomes null on the next render (revalidated
-  // from the server) and ActiveSession unmounts -- a success modal owned by
-  // it would vanish before the user ever saw it.
-  const [justFinishedMs, setJustFinishedMs] = useState<number | null>(null);
-
   return (
-    <>
-      <Card className="mb-9 flex items-center justify-between px-6 py-4">
-        <StreakLabel status={status} />
-        {activeCheckin ? (
-          <ActiveSession
-            checkin={activeCheckin}
-            challenges={challenges}
-            onCheckedOut={setJustFinishedMs}
-          />
-        ) : (
-          <StartCheckinControl />
-        )}
-      </Card>
-
-      {justFinishedMs !== null && (
-        <CheckoutSuccessModal elapsedMs={justFinishedMs} onClose={() => setJustFinishedMs(null)} />
-      )}
-    </>
+    <Card className="mb-9 flex items-center justify-between px-6 py-4">
+      <StreakLabel status={status} />
+      {activeCheckin ? <ActiveLink checkin={activeCheckin} /> : <StartCheckinControl />}
+    </Card>
   );
 }
 
@@ -76,7 +57,7 @@ function StartCheckinControl() {
   function handleStart() {
     startTransition(async () => {
       const result = await startCheckin();
-      setMessage(result.message ?? null);
+      if (result?.message) setMessage(result.message);
     });
   }
 
@@ -90,53 +71,23 @@ function StartCheckinControl() {
   );
 }
 
-function ActiveSession({
-  checkin,
-  challenges,
-  onCheckedOut,
-}: {
-  checkin: ActiveCheckin;
-  challenges: ChallengeOption[];
-  onCheckedOut: (elapsedMs: number) => void;
-}) {
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
+function ActiveLink({ checkin }: { checkin: ActiveCheckin }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    if (checkin.pausedAt) return;
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [checkin.pausedAt]);
 
-  function handleCancel() {
-    startTransition(async () => {
-      await cancelCheckin(checkin.id);
-    });
-  }
+  const runningUntil = checkin.pausedAt ? checkin.pausedAt.getTime() : now;
+  const elapsed = Math.max(0, runningUntil - checkin.createdAt.getTime() - checkin.pausedMs);
 
   return (
-    <div className="flex items-center gap-4">
-      <span className="text-sm text-accent">
-        Estudando há {formatElapsed(now - checkin.createdAt.getTime())}
-      </span>
-      <button
-        type="button"
-        onClick={handleCancel}
-        disabled={isPending}
-        className="text-[13px] text-white/45 transition-colors hover:text-white/70 disabled:opacity-50"
-      >
-        Cancelar
-      </button>
-      <Button size="sm" onClick={() => setCheckoutOpen(true)}>
-        Finalizar check-out
+    <Link href="/cronometro">
+      <Button size="sm">
+        {checkin.pausedAt ? "Pausado" : "Estudando"} há {formatElapsed(elapsed)} -- ver cronômetro
       </Button>
-      <CheckOutDialog
-        checkin={checkin}
-        challenges={challenges}
-        open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        onCheckedOut={onCheckedOut}
-      />
-    </div>
+    </Link>
   );
 }

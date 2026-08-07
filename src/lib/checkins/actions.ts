@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
@@ -8,7 +9,7 @@ import { canManageChallenge } from "@/lib/challenges/queries";
 import { toDateKey, fromDateKey } from "@/lib/dates";
 import { CheckoutSchema, type FormState } from "@/lib/validations";
 
-const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios"];
+const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios", "/cronometro"];
 
 function revalidateChallenges(challengeIds: string[]) {
   for (const id of challengeIds) revalidatePath(`/desafios/${id}`);
@@ -18,7 +19,10 @@ function revalidateChallenges(challengeIds: string[]) {
  * Starts a check-in: just a timestamp. Title, description, the proof
  * photo, and which challenges (if any) it's posted under are all collected
  * later, at check-out (see checkOutCheckin). Only one check-in can be in
- * progress at a time per user.
+ * progress at a time per user. Redirects to the cronometer page on success
+ * -- redirect() throws internally, so it must stay outside the try/catch
+ * around the write, or Next's own control-flow exception would get caught
+ * and reported as a generic failure.
  */
 export async function startCheckin(): Promise<{ message?: string }> {
   const session = await verifySession();
@@ -27,21 +31,19 @@ export async function startCheckin(): Promise<{ message?: string }> {
     where: { userId: session.userId, checkedOutAt: null },
     select: { id: true },
   });
-  if (active) {
-    return { message: "Você já tem um check-in em andamento." };
+  if (!active) {
+    try {
+      await prisma.checkin.create({ data: { userId: session.userId } });
+    } catch {
+      return {
+        message:
+          "Não foi possível iniciar o check-in. Confira se o banco de dados está conectado (veja o README).",
+      };
+    }
+    revalidatePath("/feed");
   }
 
-  try {
-    await prisma.checkin.create({ data: { userId: session.userId } });
-  } catch {
-    return {
-      message:
-        "Não foi possível iniciar o check-in. Confira se o banco de dados está conectado (veja o README).",
-    };
-  }
-
-  revalidatePath("/feed");
-  return {};
+  redirect("/cronometro");
 }
 
 /**
@@ -49,7 +51,8 @@ export async function startCheckin(): Promise<{ message?: string }> {
  * mistake). Never touches study_days -- only a completed check-out earns a
  * study day, so there's nothing to undo there. An in-progress check-in was
  * never linked to any challenge yet either (that's chosen at check-out), so
- * there's nothing to revalidate beyond the feed.
+ * there's nothing to revalidate beyond the feed. Only ever triggered from
+ * the cronometer page now, so sends the user back to the feed on success.
  */
 export async function cancelCheckin(checkinId: string): Promise<{ message?: string }> {
   const session = await verifySession();
@@ -69,6 +72,50 @@ export async function cancelCheckin(checkinId: string): Promise<{ message?: stri
   }
 
   revalidatePath("/feed");
+  redirect("/feed");
+}
+
+/**
+ * Pauses an in-progress check-in -- the interval until resumeCheckin is
+ * called doesn't count toward study time (see Checkin.pausedMs). A no-op if
+ * already paused, so a stale/double click can't lose time by pausing twice.
+ */
+export async function pauseCheckin(checkinId: string): Promise<{ message?: string }> {
+  const session = await verifySession();
+
+  const checkin = await prisma.checkin.findUnique({
+    where: { id: checkinId },
+    select: { userId: true, checkedOutAt: true, pausedAt: true },
+  });
+  if (!checkin || checkin.userId !== session.userId || checkin.checkedOutAt) {
+    return { message: "Não foi possível pausar esse check-in." };
+  }
+  if (checkin.pausedAt) return {};
+
+  await prisma.checkin.update({ where: { id: checkinId }, data: { pausedAt: new Date() } });
+  revalidatePath("/cronometro");
+  return {};
+}
+
+/** Resumes a paused check-in, folding the paused interval into pausedMs. A no-op if not currently paused. */
+export async function resumeCheckin(checkinId: string): Promise<{ message?: string }> {
+  const session = await verifySession();
+
+  const checkin = await prisma.checkin.findUnique({
+    where: { id: checkinId },
+    select: { userId: true, checkedOutAt: true, pausedAt: true, pausedMs: true },
+  });
+  if (!checkin || checkin.userId !== session.userId || checkin.checkedOutAt) {
+    return { message: "Não foi possível retomar esse check-in." };
+  }
+  if (!checkin.pausedAt) return {};
+
+  const elapsedPausedMs = Date.now() - checkin.pausedAt.getTime();
+  await prisma.checkin.update({
+    where: { id: checkinId },
+    data: { pausedAt: null, pausedMs: checkin.pausedMs + elapsedPausedMs },
+  });
+  revalidatePath("/cronometro");
   return {};
 }
 
@@ -87,7 +134,7 @@ export async function checkOutCheckin(
 
   const checkin = await prisma.checkin.findUnique({
     where: { id: checkinId },
-    select: { userId: true, checkedOutAt: true, createdAt: true },
+    select: { userId: true, checkedOutAt: true, createdAt: true, pausedAt: true, pausedMs: true },
   });
   if (!checkin || checkin.userId !== session.userId) {
     return { message: "Você não pode finalizar esse check-in." };
@@ -95,6 +142,12 @@ export async function checkOutCheckin(
   if (checkin.checkedOutAt) {
     return { message: "Esse check-in já foi finalizado." };
   }
+  // Checking out while paused still needs to fold that trailing pause into
+  // pausedMs -- otherwise the break the user never resumed from would
+  // silently count as study time.
+  const finalPausedMs = checkin.pausedAt
+    ? checkin.pausedMs + (Date.now() - checkin.pausedAt.getTime())
+    : checkin.pausedMs;
 
   const validated = CheckoutSchema.safeParse({
     title: formData.get("title"),
@@ -145,7 +198,14 @@ export async function checkOutCheckin(
     await prisma.$transaction(async (tx) => {
       await tx.checkin.update({
         where: { id: checkinId },
-        data: { title, description: description || null, photoUrl, checkedOutAt: new Date() },
+        data: {
+          title,
+          description: description || null,
+          photoUrl,
+          checkedOutAt: new Date(),
+          pausedAt: null,
+          pausedMs: finalPausedMs,
+        },
       });
 
       if (challengeIds.length > 0) {

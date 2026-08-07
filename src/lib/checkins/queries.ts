@@ -212,11 +212,15 @@ export async function getChallengeCheckins(
 export type ActiveCheckin = {
   id: string;
   createdAt: Date;
+  /** Set while on a break -- see Checkin.pausedAt. Null means currently running (or never started a pause). */
+  pausedAt: Date | null;
+  /** Accumulated paused duration in ms, not counting an in-progress pause (pausedAt) -- see Checkin.pausedMs. */
+  pausedMs: number;
 };
 
 /**
  * The user's in-progress check-in (started, not yet checked out), if any --
- * drives the Feed banner's timer/"Finalizar" state. At most one at a time,
+ * drives the navbar timer and the cronometer page. At most one at a time,
  * see startCheckin. Which challenges (if any) it'll be linked to is chosen
  * at check-out, not here, so there's nothing challenge-related to select yet.
  */
@@ -224,19 +228,19 @@ export async function getActiveCheckin(userId: string): Promise<ActiveCheckin | 
   return prisma.checkin.findFirst({
     where: { userId, checkedOutAt: null },
     orderBy: { createdAt: "desc" },
-    select: { id: true, createdAt: true },
+    select: { id: true, createdAt: true, pausedAt: true, pausedMs: true },
   });
 }
 
-/** Total hours studied this calendar month, summed from completed check-ins' check-in-to-check-out duration. Drives the profile's "Este mês" stat. */
+/** Total hours studied this calendar month, summed from completed check-ins' check-in-to-check-out duration minus any paused time. Drives the profile's "Este mês" stat. */
 export async function getStudyHoursThisMonth(userId: string): Promise<number> {
   const rows = await prisma.checkin.findMany({
     where: { userId, checkedOutAt: { not: null, gte: startOfMonth() } },
-    select: { createdAt: true, checkedOutAt: true },
+    select: { createdAt: true, checkedOutAt: true, pausedMs: true },
   });
 
   const totalMs = rows.reduce(
-    (sum, r) => sum + (r.checkedOutAt!.getTime() - r.createdAt.getTime()),
+    (sum, r) => sum + (r.checkedOutAt!.getTime() - r.createdAt.getTime() - r.pausedMs),
     0
   );
   return totalMs / (1000 * 60 * 60);

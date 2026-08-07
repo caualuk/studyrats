@@ -224,7 +224,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
     prisma.challenge.findUnique({ where: { id: challengeId }, select: { ownerId: true } }),
     prisma.checkin.findMany({
       where: { checkedOutAt: { not: null }, challenges: { some: { challengeId } } },
-      select: { userId: true, createdAt: true, checkedOutAt: true },
+      select: { userId: true, createdAt: true, checkedOutAt: true, pausedMs: true },
     }),
   ]);
 
@@ -232,7 +232,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
   for (const c of checkins) {
     const stats = statsByUser.get(c.userId) ?? { count: 0, ms: 0 };
     stats.count += 1;
-    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime();
+    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime() - c.pausedMs;
     statsByUser.set(c.userId, stats);
   }
 

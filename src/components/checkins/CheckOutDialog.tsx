@@ -57,7 +57,11 @@ export function CheckOutDialog({
     startTransition(async () => {
       const result = await checkOutCheckin(checkin.id, undefined, formData);
       if (result?.success) {
-        onCheckedOut(Date.now() - checkin.createdAt.getTime());
+        // Net study time: total wall time minus any paused stretches,
+        // including one still open if checkout happens mid-pause -- mirrors
+        // what checkOutCheckin itself folds into pausedMs server-side.
+        const openPauseMs = checkin.pausedAt ? Date.now() - checkin.pausedAt.getTime() : 0;
+        onCheckedOut(Date.now() - checkin.createdAt.getTime() - checkin.pausedMs - openPauseMs);
         onClose();
         return;
       }

@@ -53,14 +53,14 @@ export async function getRanking(
       createdAt: { gte: since },
       checkedOutAt: { not: null },
     },
-    select: { userId: true, createdAt: true, checkedOutAt: true },
+    select: { userId: true, createdAt: true, checkedOutAt: true, pausedMs: true },
   });
 
   const statsByUser = new Map<string, { count: number; ms: number }>();
   for (const c of checkins) {
     const stats = statsByUser.get(c.userId) ?? { count: 0, ms: 0 };
     stats.count += 1;
-    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime();
+    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime() - c.pausedMs;
     statsByUser.set(c.userId, stats);
   }
 

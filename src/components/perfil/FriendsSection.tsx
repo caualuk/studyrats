@@ -3,9 +3,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AddFriendDialog } from "@/components/perfil/AddFriendDialog";
-import type { PublicUser } from "@/lib/friends/queries";
+import type { FriendWithStatus } from "@/lib/friends/queries";
 
-export function FriendsSection({ friends }: { friends: PublicUser[] }) {
+export function FriendsSection({ friends }: { friends: FriendWithStatus[] }) {
   return (
     <div className="mt-8">
       <div className="mb-[18px] flex items-center justify-between">
@@ -25,6 +25,9 @@ export function FriendsSection({ friends }: { friends: PublicUser[] }) {
               <Card className="flex flex-col items-center gap-2 px-3 py-4 text-center transition-colors hover:border-border-strong">
                 <Avatar src={friend.avatarUrl} name={friend.name} size="lg" />
                 <span className="line-clamp-1 text-xs font-bold">{friend.name}</span>
+                {friend.isStudying && (
+                  <span className="text-[10px] font-semibold text-accent">estudando...</span>
+                )}
               </Card>
             </Link>
           ))}

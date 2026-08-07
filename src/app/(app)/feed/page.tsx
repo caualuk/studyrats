@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getActiveCheckin, getFeedCheckins, getUserStudyDays } from "@/lib/checkins/queries";
-import { getMyChallengeOptions } from "@/lib/challenges/queries";
 import { getMyFriends } from "@/lib/friends/queries";
 import { getStreakStatus } from "@/lib/dates";
 import { CheckinCard } from "@/components/feed/CheckinCard";
@@ -13,10 +12,9 @@ export const metadata: Metadata = { title: "Feed" };
 
 export default async function FeedPage() {
   const user = await getCurrentUser();
-  const [checkins, studyDays, challenges, activeCheckin, friends] = await Promise.all([
+  const [checkins, studyDays, activeCheckin, friends] = await Promise.all([
     getFeedCheckins(user.id),
     getUserStudyDays(user.id),
-    getMyChallengeOptions(user.id),
     getActiveCheckin(user.id),
     getMyFriends(user.id),
   ]);
@@ -29,7 +27,7 @@ export default async function FeedPage() {
         Todo check-in vem com foto. Sem foto, não conta.
       </p>
 
-      <StreakBanner status={streakStatus} challenges={challenges} activeCheckin={activeCheckin} />
+      <StreakBanner status={streakStatus} activeCheckin={activeCheckin} />
 
       <h2 className="mb-[18px] text-xl font-bold">Últimos check-ins.</h2>
 

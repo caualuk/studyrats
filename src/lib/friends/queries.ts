@@ -15,11 +15,25 @@ export const PUBLIC_USER_SELECT = {
   avatarUrl: true,
 } as const;
 
-export async function getMyFriends(userId: string): Promise<PublicUser[]> {
+export type FriendWithStatus = PublicUser & {
+  /** Whether this friend currently has a check-in in progress (not yet checked out). */
+  isStudying: boolean;
+};
+
+export async function getMyFriends(userId: string): Promise<FriendWithStatus[]> {
   const rows = await prisma.friendship.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
     select: { friend: { select: PUBLIC_USER_SELECT } },
   });
-  return rows.map((r) => r.friend);
+  const friends = rows.map((r) => r.friend);
+  if (friends.length === 0) return [];
+
+  const active = await prisma.checkin.findMany({
+    where: { userId: { in: friends.map((f) => f.id) }, checkedOutAt: null },
+    select: { userId: true },
+  });
+  const studyingIds = new Set(active.map((a) => a.userId));
+
+  return friends.map((f) => ({ ...f, isStudying: studyingIds.has(f.id) }));
 }

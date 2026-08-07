@@ -105,6 +105,14 @@ model Checkin {
   // "sem foto não conta": an unfinished session was never proven, so it
   // never shows up.
   checkedOutAt DateTime?
+  // Set while the session is on a break, cleared on resume -- the interval
+  // between the two doesn't count as study time (see pausedMs). Null both
+  // before any pause and after resuming.
+  pausedAt DateTime?
+  // Accumulated paused duration in ms, folded in on every resume (and
+  // finalized at check-out if still paused) -- everywhere elapsed/study
+  // time is computed, it's (checkedOutAt|now) - createdAt - pausedMs.
+  pausedMs    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
