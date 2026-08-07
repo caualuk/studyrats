@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatDatePtBR, fromDateKey, startOfMonth } from "@/lib/dates";
-import { getManagedChallengeIds } from "@/lib/challenges/queries";
+import { getManagedChallengeIds, getMyChallengeIds } from "@/lib/challenges/queries";
 
 /** Every completed-checkin query filters on this -- an in-progress session (no checkedOutAt) never "counts" anywhere. */
 const COMPLETED: Prisma.CheckinWhereInput = { checkedOutAt: { not: null } };
@@ -47,10 +47,17 @@ type CheckinWithRelations = Prisma.CheckinGetPayload<{
 function toFeedCheckin(
   c: CheckinWithRelations,
   currentUserId: string,
-  managedChallengeIds: Set<string>
+  managedChallengeIds: Set<string>,
+  visibleChallengeIds: Set<string>
 ): FeedCheckin {
   const isOwner = c.userId === currentUserId;
-  const challenges = c.challenges.map((link) => link.challenge);
+  const allChallenges = c.challenges.map((link) => link.challenge);
+  // Badges only show challenges the *viewer* is also a member of -- a
+  // check-in can stay visible (via friendship, or another shared challenge)
+  // without leaking the name of a challenge the viewer isn't part of.
+  // canDelete still checks the full, unfiltered list: moderation authority
+  // doesn't depend on what's shown.
+  const challenges = allChallenges.filter((ch) => visibleChallengeIds.has(ch.id));
   return {
     id: c.id,
     // Non-null: every caller here queries with the COMPLETED filter, and
@@ -70,7 +77,7 @@ function toFeedCheckin(
     commentsCount: c._count.comments,
     likedByMe: c.likes.length > 0,
     isOwner,
-    canDelete: isOwner || challenges.some((ch) => managedChallengeIds.has(ch.id)),
+    canDelete: isOwner || allChallenges.some((ch) => managedChallengeIds.has(ch.id)),
   };
 }
 
@@ -94,11 +101,7 @@ export async function getFeedCheckins(
   const friendIds = friendships.map((f) => f.friendId);
   if (friendIds.length === 0) return [];
 
-  const myMemberships = await prisma.challengeMember.findMany({
-    where: { userId: currentUserId },
-    select: { challengeId: true },
-  });
-  const myChallengeIds = myMemberships.map((m) => m.challengeId);
+  const myChallengeIds = await getMyChallengeIds(currentUserId);
 
   const [checkins, managedChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
@@ -107,7 +110,7 @@ export async function getFeedCheckins(
         userId: { in: friendIds },
         OR: [
           { challenges: { none: {} } },
-          { challenges: { some: { challengeId: { in: myChallengeIds } } } },
+          { challenges: { some: { challengeId: { in: [...myChallengeIds] } } } },
         ],
       },
       orderBy: { createdAt: "desc" },
@@ -117,7 +120,7 @@ export async function getFeedCheckins(
     getManagedChallengeIds(currentUserId),
   ]);
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds));
+  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds, myChallengeIds));
 }
 
 /**
@@ -145,16 +148,17 @@ export async function getUserCheckins(
   userId: string,
   viewerId: string = userId
 ): Promise<FeedCheckin[]> {
-  const [checkins, managedChallengeIds] = await Promise.all([
+  const [checkins, managedChallengeIds, myChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
       where: { userId, ...COMPLETED },
       orderBy: { createdAt: "desc" },
       include: feedCheckinInclude(viewerId),
     }),
     getManagedChallengeIds(viewerId),
+    getMyChallengeIds(viewerId),
   ]);
 
-  return checkins.map((c) => toFeedCheckin(c, viewerId, managedChallengeIds));
+  return checkins.map((c) => toFeedCheckin(c, viewerId, managedChallengeIds, myChallengeIds));
 }
 
 /**
@@ -191,7 +195,7 @@ export async function getChallengeCheckins(
   currentUserId: string,
   limit = 60
 ): Promise<FeedCheckin[]> {
-  const [checkins, managedChallengeIds] = await Promise.all([
+  const [checkins, managedChallengeIds, myChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
       where: { ...COMPLETED, challenges: { some: { challengeId } } },
       orderBy: { createdAt: "desc" },
@@ -199,9 +203,10 @@ export async function getChallengeCheckins(
       include: feedCheckinInclude(currentUserId),
     }),
     getManagedChallengeIds(currentUserId),
+    getMyChallengeIds(currentUserId),
   ]);
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds));
+  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds, myChallengeIds));
 }
 
 export type ActiveCheckin = {

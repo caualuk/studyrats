@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
 import { EditChallengeDialog } from "@/components/desafios/EditChallengeDialog";
+import { LeaveChallengeButton } from "@/components/desafios/LeaveChallengeButton";
 import { WEEKDAY_SHORT_PT } from "@/lib/dates";
 import type { ChallengeDetail } from "@/lib/challenges/queries";
 
@@ -34,6 +35,7 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
               isOwner={challenge.isOwner}
             />
           )}
+          {!challenge.isOwner && <LeaveChallengeButton challengeId={challenge.id} />}
         </div>
       </div>
       {challenge.description && (

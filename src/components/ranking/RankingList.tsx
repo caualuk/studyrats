@@ -1,8 +1,15 @@
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
-import type { RankingRow } from "@/lib/ranking/queries";
+import { formatElapsed } from "@/lib/dates";
+import type { RankingMetric, RankingRow } from "@/lib/ranking/queries";
 
-export function RankingList({ rows }: { rows: RankingRow[] }) {
+export function RankingList({
+  rows,
+  metric = "checkins",
+}: {
+  rows: RankingRow[];
+  metric?: RankingMetric;
+}) {
   return (
     <Card className="p-2 text-left">
       {rows.map((row) => (
@@ -14,7 +21,7 @@ export function RankingList({ rows }: { rows: RankingRow[] }) {
           <Avatar src={row.avatarUrl} name={row.name} size="lg" />
           <span className="flex-1 text-sm">{row.name}</span>
           <span className="text-[13px] font-bold text-accent">
-            {row.checkinsCount} check-ins
+            {metric === "hours" ? formatElapsed(row.studyMs) : `${row.checkinsCount} check-ins`}
           </span>
         </div>
       ))}

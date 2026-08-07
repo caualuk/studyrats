@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getChallengeDetail, getChallengeMembers } from "@/lib/challenges/queries";
@@ -8,22 +9,34 @@ import {
   type FeedCheckin,
 } from "@/lib/checkins/queries";
 import { daysBetween, getStreakStatus } from "@/lib/dates";
-import type { RankingRow } from "@/lib/ranking/queries";
+import type { RankingMetric, RankingRow } from "@/lib/ranking/queries";
 import { ChallengeDetailHeader } from "@/components/desafios/ChallengeDetailHeader";
 import { ChallengeParticipants } from "@/components/desafios/ChallengeParticipants";
 import { ChallengeTrack, type TrackRunner } from "@/components/desafios/ChallengeTrack";
 import { RankingList } from "@/components/ranking/RankingList";
 import { CheckinCard } from "@/components/feed/CheckinCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = { title: "Desafio" };
 
+const METRICS: { value: RankingMetric; label: string }[] = [
+  { value: "checkins", label: "Check-ins" },
+  { value: "hours", label: "Horas" },
+];
+const DEFAULT_METRIC: RankingMetric = "checkins";
+
 export default async function ChallengeDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ metric?: string }>;
 }) {
   const { id } = await params;
+  const { metric: rawMetric } = await searchParams;
+  const activeMetric =
+    METRICS.find((m) => m.value === rawMetric)?.value ?? DEFAULT_METRIC;
   const user = await getCurrentUser();
 
   const challenge = await getChallengeDetail(id, user.id);
@@ -37,13 +50,18 @@ export default async function ChallengeDetailPage({
 
   const rankedMembers = [...members].sort((a, b) => b.checkinsCount - a.checkinsCount);
 
-  const rankingRows: RankingRow[] = rankedMembers.map((member, index) => ({
-    position: index + 1,
-    userId: member.userId,
-    name: member.name,
-    avatarUrl: member.avatarUrl,
-    checkinsCount: member.checkinsCount,
-  }));
+  const rankingRows: RankingRow[] = [...members]
+    .sort((a, b) =>
+      activeMetric === "hours" ? b.studyMs - a.studyMs : b.checkinsCount - a.checkinsCount
+    )
+    .map((member, index) => ({
+      position: index + 1,
+      userId: member.userId,
+      name: member.name,
+      avatarUrl: member.avatarUrl,
+      checkinsCount: member.checkinsCount,
+      studyMs: member.studyMs,
+    }));
 
   // With a deadline, the goal is only met by keeping the streak alive all
   // the way to that date -- so progress is the member's *current* streak
@@ -96,8 +114,25 @@ export default async function ChallengeDetailPage({
       <ChallengeTrack runners={runners} />
 
       <h2 className="mb-4 mt-10 text-xl font-bold">Ranking.</h2>
+      <div className="mb-4 inline-flex gap-1 rounded-full border border-border-strong p-1">
+        {METRICS.map((m) => (
+          <Link
+            key={m.value}
+            href={m.value === DEFAULT_METRIC ? `/desafios/${id}` : `/desafios/${id}?metric=${m.value}`}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors",
+              m.value === activeMetric ? "bg-accent text-accent-ink" : "text-white/50 hover:text-white/80"
+            )}
+          >
+            {m.label}
+          </Link>
+        ))}
+      </div>
       {rankingRows.some((row) => row.checkinsCount > 0) ? (
-        <RankingList rows={rankingRows.filter((row) => row.checkinsCount > 0)} />
+        <RankingList
+          rows={rankingRows.filter((row) => row.checkinsCount > 0)}
+          metric={activeMetric}
+        />
       ) : (
         <EmptyState title="Ninguém fez check-in nesse desafio ainda." />
       )}

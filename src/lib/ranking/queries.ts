@@ -8,9 +8,11 @@ export type RankingRow = {
   name: string;
   avatarUrl: string | null;
   checkinsCount: number;
+  studyMs: number;
 };
 
 export type RankingPeriod = "day" | "week" | "month";
+export type RankingMetric = "checkins" | "hours";
 
 function periodStart(period: RankingPeriod): Date {
   switch (period) {
@@ -23,34 +25,66 @@ function periodStart(period: RankingPeriod): Date {
   }
 }
 
-/** Ranks users by how many check-ins they've logged since the start of `period`. */
-export async function getRanking(period: RankingPeriod, limit = 10): Promise<RankingRow[]> {
+/**
+ * Ranks users by check-ins or total study time logged since the start of
+ * `period`, scoped to `currentUserId` and their friends -- same audience as
+ * the feed, so ranking never surfaces strangers. Fetched as raw rows (not a
+ * groupBy) because both metrics are needed regardless of which one is
+ * sorted on -- the inactive metric still shows in the row, same tradeoff as
+ * getStudyHoursThisMonth.
+ */
+export async function getRanking(
+  period: RankingPeriod,
+  metric: RankingMetric = "checkins",
+  currentUserId: string,
+  limit = 10
+): Promise<RankingRow[]> {
   const since = periodStart(period);
 
-  const grouped = await prisma.checkin.groupBy({
-    by: ["userId"],
-    where: { createdAt: { gte: since }, checkedOutAt: { not: null } },
-    _count: { id: true },
-    orderBy: { _count: { id: "desc" } },
-    take: limit,
+  const friendships = await prisma.friendship.findMany({
+    where: { userId: currentUserId },
+    select: { friendId: true },
+  });
+  const audienceIds = [currentUserId, ...friendships.map((f) => f.friendId)];
+
+  const checkins = await prisma.checkin.findMany({
+    where: {
+      userId: { in: audienceIds },
+      createdAt: { gte: since },
+      checkedOutAt: { not: null },
+    },
+    select: { userId: true, createdAt: true, checkedOutAt: true },
   });
 
-  if (grouped.length === 0) return [];
+  const statsByUser = new Map<string, { count: number; ms: number }>();
+  for (const c of checkins) {
+    const stats = statsByUser.get(c.userId) ?? { count: 0, ms: 0 };
+    stats.count += 1;
+    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime();
+    statsByUser.set(c.userId, stats);
+  }
+
+  const ranked = [...statsByUser.entries()]
+    .sort((a, b) => (metric === "hours" ? b[1].ms - a[1].ms : b[1].count - a[1].count))
+    .slice(0, limit);
+
+  if (ranked.length === 0) return [];
 
   const users = await prisma.user.findMany({
-    where: { id: { in: grouped.map((g) => g.userId) } },
+    where: { id: { in: ranked.map(([userId]) => userId) } },
     select: { id: true, name: true, avatarUrl: true },
   });
   const userById = new Map(users.map((u) => [u.id, u]));
 
-  return grouped.map((g, index) => {
-    const user = userById.get(g.userId);
+  return ranked.map(([userId, stats], index) => {
+    const user = userById.get(userId);
     return {
       position: index + 1,
-      userId: g.userId,
+      userId,
       name: user?.name ?? "Usuário removido",
       avatarUrl: user?.avatarUrl ?? null,
-      checkinsCount: g._count.id,
+      checkinsCount: stats.count,
+      studyMs: stats.ms,
     };
   });
 }

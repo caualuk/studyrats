@@ -182,6 +182,21 @@ export async function getManagedChallengeIds(userId: string): Promise<Set<string
   return new Set([...owned.map((c) => c.id), ...adminOf.map((m) => m.challengeId)]);
 }
 
+/**
+ * Every challenge `userId` is a member of -- gates which challenge badges a
+ * viewer may see on someone else's check-in (a check-in linked to a
+ * challenge the viewer isn't part of shouldn't reveal that challenge's name
+ * to them, even if the check-in itself is visible via a *different* shared
+ * challenge or the friendship itself).
+ */
+export async function getMyChallengeIds(userId: string): Promise<Set<string>> {
+  const memberships = await prisma.challengeMember.findMany({
+    where: { userId },
+    select: { challengeId: true },
+  });
+  return new Set(memberships.map((m) => m.challengeId));
+}
+
 export type ChallengeMemberRow = {
   userId: string;
   name: string;
@@ -190,11 +205,12 @@ export type ChallengeMemberRow = {
   isOwner: boolean;
   isAdmin: boolean;
   checkinsCount: number;
+  studyMs: number;
 };
 
-/** Every member of a challenge, each with their check-in count within it. */
+/** Every member of a challenge, each with their check-in count and total study time within it. */
 export async function getChallengeMembers(challengeId: string): Promise<ChallengeMemberRow[]> {
-  const [members, challenge, grouped] = await Promise.all([
+  const [members, challenge, checkins] = await Promise.all([
     prisma.challengeMember.findMany({
       where: { challengeId },
       orderBy: { joinedAt: "asc" },
@@ -206,22 +222,31 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
       },
     }),
     prisma.challenge.findUnique({ where: { id: challengeId }, select: { ownerId: true } }),
-    prisma.checkin.groupBy({
-      by: ["userId"],
+    prisma.checkin.findMany({
       where: { checkedOutAt: { not: null }, challenges: { some: { challengeId } } },
-      _count: { id: true },
+      select: { userId: true, createdAt: true, checkedOutAt: true },
     }),
   ]);
 
-  const checkinsByUser = new Map(grouped.map((g) => [g.userId, g._count.id]));
+  const statsByUser = new Map<string, { count: number; ms: number }>();
+  for (const c of checkins) {
+    const stats = statsByUser.get(c.userId) ?? { count: 0, ms: 0 };
+    stats.count += 1;
+    stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime();
+    statsByUser.set(c.userId, stats);
+  }
 
-  return members.map((m) => ({
-    userId: m.userId,
-    name: m.user.name,
-    avatarUrl: m.user.avatarUrl,
-    joinedAt: m.joinedAt,
-    isOwner: m.userId === challenge?.ownerId,
-    isAdmin: m.isAdmin,
-    checkinsCount: checkinsByUser.get(m.userId) ?? 0,
-  }));
+  return members.map((m) => {
+    const stats = statsByUser.get(m.userId) ?? { count: 0, ms: 0 };
+    return {
+      userId: m.userId,
+      name: m.user.name,
+      avatarUrl: m.user.avatarUrl,
+      joinedAt: m.joinedAt,
+      isOwner: m.userId === challenge?.ownerId,
+      isAdmin: m.isAdmin,
+      checkinsCount: stats.count,
+      studyMs: stats.ms,
+    };
+  });
 }

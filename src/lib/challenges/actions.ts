@@ -186,6 +186,43 @@ export async function deleteChallenge(challengeId: string): Promise<{ message?: 
   redirect("/desafios");
 }
 
+/**
+ * Removes the caller from a challenge -- their own check-ins already linked
+ * to it stay linked (only the membership row goes), same as deleteChallenge
+ * not touching check-ins. The owner can't leave this way: with no other
+ * owner to hand the challenge to, leaving would strand it, so they have to
+ * delete it instead.
+ */
+export async function leaveChallenge(challengeId: string): Promise<{ message?: string }> {
+  const session = await verifySession();
+
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { ownerId: true },
+  });
+  if (!challenge) {
+    return { message: "Desafio não encontrado." };
+  }
+  if (challenge.ownerId === session.userId) {
+    return { message: "Você é o dono desse desafio -- exclua-o em vez de sair." };
+  }
+
+  const membership = await prisma.challengeMember.findUnique({
+    where: { challengeId_userId: { challengeId, userId: session.userId } },
+  });
+  if (!membership) {
+    return { message: "Você não participa desse desafio." };
+  }
+
+  await prisma.challengeMember.delete({
+    where: { challengeId_userId: { challengeId, userId: session.userId } },
+  });
+
+  revalidatePath("/desafios");
+  revalidatePath("/feed");
+  redirect("/desafios");
+}
+
 /** Grants or revokes admin on a challenge for another member. Owner/admin only. */
 export async function setChallengeMemberAdmin(
   challengeId: string,
