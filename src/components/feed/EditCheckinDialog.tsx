@@ -2,8 +2,10 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { editCheckin } from "@/lib/checkins/actions";
+import { setInputFile } from "@/lib/fileInput";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ImageCropper } from "@/components/ui/ImageCropper";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import type { FeedCheckin } from "@/lib/checkins/queries";
@@ -20,7 +22,9 @@ export function EditCheckinDialog({
   const editThisCheckin = editCheckin.bind(null, checkin.id);
   const [state, formAction, pending] = useActionState(editThisCheckin, undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (state?.success) onClose();
@@ -50,6 +54,7 @@ export function EditCheckinDialog({
             )}
           </label>
           <input
+            ref={photoInputRef}
             id="edit-photo"
             name="photo"
             type="file"
@@ -57,7 +62,23 @@ export function EditCheckinDialog({
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];
-              setPreviewUrl(file ? URL.createObjectURL(file) : null);
+              if (file) setCropFile(file);
+            }}
+          />
+
+          <ImageCropper
+            key={cropFile ? `${cropFile.name}-${cropFile.lastModified}-${cropFile.size}` : "empty"}
+            file={cropFile}
+            open={cropFile !== null}
+            onCancel={() => {
+              setCropFile(null);
+              if (photoInputRef.current) photoInputRef.current.value = "";
+            }}
+            onConfirm={(blob) => {
+              const cropped = new File([blob], "checkin.jpg", { type: "image/jpeg" });
+              if (photoInputRef.current) setInputFile(photoInputRef.current, cropped);
+              setPreviewUrl(URL.createObjectURL(cropped));
+              setCropFile(null);
             }}
           />
 

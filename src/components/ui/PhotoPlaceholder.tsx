@@ -26,7 +26,13 @@ export function PhotoPlaceholder({
   return (
     <div className={cn("relative flex items-center justify-center overflow-hidden", className)}>
       {src ? (
-        <Image src={src} alt={alt} fill className="object-cover" />
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 400px"
+          className="object-cover"
+        />
       ) : color ? (
         <div className="absolute inset-0" style={{ backgroundColor: color }} />
       ) : (

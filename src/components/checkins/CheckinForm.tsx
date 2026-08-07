@@ -2,9 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createCheckin } from "@/lib/checkins/actions";
+import { setInputFile } from "@/lib/fileInput";
 import type { ChallengeOption } from "@/lib/challenges/queries";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { ImageCropper } from "@/components/ui/ImageCropper";
 
 export function CheckinForm({
   challenges = [],
@@ -18,7 +20,9 @@ export function CheckinForm({
 }) {
   const [state, formAction, pending] = useActionState(createCheckin, undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // No need to also clear `previewUrl` here: on success the parent closes
@@ -53,6 +57,7 @@ export function CheckinForm({
           )}
         </label>
         <input
+          ref={photoInputRef}
           id="photo"
           name="photo"
           type="file"
@@ -61,10 +66,26 @@ export function CheckinForm({
           className="sr-only"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            setPreviewUrl(file ? URL.createObjectURL(file) : null);
+            if (file) setCropFile(file);
           }}
         />
       </div>
+
+      <ImageCropper
+        key={cropFile ? `${cropFile.name}-${cropFile.lastModified}-${cropFile.size}` : "empty"}
+        file={cropFile}
+        open={cropFile !== null}
+        onCancel={() => {
+          setCropFile(null);
+          if (photoInputRef.current) photoInputRef.current.value = "";
+        }}
+        onConfirm={(blob) => {
+          const cropped = new File([blob], "checkin.jpg", { type: "image/jpeg" });
+          if (photoInputRef.current) setInputFile(photoInputRef.current, cropped);
+          setPreviewUrl(URL.createObjectURL(cropped));
+          setCropFile(null);
+        }}
+      />
 
       <div>
         <Label htmlFor="title">Título</Label>
