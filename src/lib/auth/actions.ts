@@ -27,7 +27,7 @@ function safeRedirectTarget(next: FormDataEntryValue | null): string {
 function isDatabaseUnavailableError(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientInitializationError ||
-    error instanceof Prisma.PrismaClientKnownRequestError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError && error.code !== "P2002") ||
     (error instanceof Error && /no such table|unable to open|ENOENT/i.test(error.message))
   );
 }
