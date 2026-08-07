@@ -11,6 +11,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Migrations need the session pooler (DDL/shadow-database support) --
+    // separate from DATABASE_URL, which src/lib/prisma.ts points at the
+    // transaction pooler for runtime queries.
+    url: env("DIRECT_URL"),
   },
 });
