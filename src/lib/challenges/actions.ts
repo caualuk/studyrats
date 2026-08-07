@@ -2,6 +2,7 @@
 
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
@@ -109,12 +110,15 @@ export async function updateChallenge(_prevState: FormState, formData: FormData)
 
   const validated = ChallengeUpdateSchema.safeParse({
     name: formData.get("name"),
+    description: formData.get("description"),
+    startDate: formData.get("startDate"),
+    endDate: formData.get("endDate"),
     coverColor: formData.get("coverColor"),
   });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
-  const { name, coverColor } = validated.data;
+  const { name, description, startDate, endDate, coverColor } = validated.data;
 
   let coverUrl: string | undefined;
   const cover = formData.get("cover");
@@ -132,6 +136,9 @@ export async function updateChallenge(_prevState: FormState, formData: FormData)
       where: { id: challengeId },
       data: {
         name,
+        description: description || null,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : null,
         coverColor: coverColor || null,
         ...(coverUrl && { coverUrl }),
       },
@@ -144,6 +151,39 @@ export async function updateChallenge(_prevState: FormState, formData: FormData)
   revalidatePath("/desafios");
   revalidatePath("/feed");
   return { success: true };
+}
+
+/**
+ * Deletes a challenge entirely -- owner-only (stricter than canManage:
+ * an admin can run day-to-day moderation, but blowing away the whole
+ * challenge for every member is reserved for whoever created it).
+ * ChallengeMember rows cascade-delete, and so do this challenge's rows in
+ * the CheckinChallenge join table -- but that only removes the *link*, not
+ * the check-ins themselves: a check-in linked to this and another challenge
+ * survives linked to the other one, and one only linked here becomes
+ * "check-in livre" instead of vanishing. Deleting the container shouldn't
+ * erase anyone's study proof.
+ */
+export async function deleteChallenge(challengeId: string): Promise<{ message?: string }> {
+  const session = await verifySession();
+
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { ownerId: true },
+  });
+  if (!challenge || challenge.ownerId !== session.userId) {
+    return { message: "Você não pode excluir esse desafio." };
+  }
+
+  try {
+    await prisma.challenge.delete({ where: { id: challengeId } });
+  } catch {
+    return { message: "Não foi possível excluir o desafio." };
+  }
+
+  revalidatePath("/desafios");
+  revalidatePath("/feed");
+  redirect("/desafios");
 }
 
 /** Grants or revokes admin on a challenge for another member. Owner/admin only. */

@@ -12,7 +12,8 @@ export type FeedCheckin = {
   title: string;
   description: string | null;
   photoUrl: string;
-  tag: string;
+  /** Every challenge this check-in was posted under -- empty means "check-in livre". Chosen at check-out, see checkOutCheckin. */
+  challenges: { id: string; name: string }[];
   authorId: string;
   authorName: string;
   authorUsername: string;
@@ -24,14 +25,14 @@ export type FeedCheckin = {
   likedByMe: boolean;
   /** Whether the viewer is the author -- gates the edit control (and, together with canDelete, the delete control). */
   isOwner: boolean;
-  /** Author, or an owner/admin of the challenge this check-in was posted under -- gates the delete control. */
+  /** Author, or an owner/admin of any challenge this check-in is linked to -- gates the delete control. */
   canDelete: boolean;
 };
 
 function feedCheckinInclude(currentUserId: string) {
   return {
     user: { select: { name: true, username: true, avatarUrl: true } },
-    challenge: { select: { name: true } },
+    challenges: { select: { challenge: { select: { id: true, name: true } } } },
     _count: { select: { likes: true, comments: true } },
     // Only fetches *my* like row (if any) instead of every like, so we can
     // derive `likedByMe` without loading the whole likes list.
@@ -49,6 +50,7 @@ function toFeedCheckin(
   managedChallengeIds: Set<string>
 ): FeedCheckin {
   const isOwner = c.userId === currentUserId;
+  const challenges = c.challenges.map((link) => link.challenge);
   return {
     id: c.id,
     // Non-null: every caller here queries with the COMPLETED filter, and
@@ -57,7 +59,7 @@ function toFeedCheckin(
     title: c.title!,
     description: c.description,
     photoUrl: c.photoUrl!,
-    tag: c.challenge?.name ?? "Check-in livre",
+    challenges,
     authorId: c.userId,
     authorName: c.user.name,
     authorUsername: c.user.username,
@@ -68,17 +70,18 @@ function toFeedCheckin(
     commentsCount: c._count.comments,
     likedByMe: c.likes.length > 0,
     isOwner,
-    canDelete: isOwner || (c.challengeId != null && managedChallengeIds.has(c.challengeId)),
+    canDelete: isOwner || challenges.some((ch) => managedChallengeIds.has(ch.id)),
   };
 }
 
 /**
  * The Feed shows only friends' check-ins -- not the viewer's own, and
- * nothing at all if they have no friends yet. A friend's check-in under a
- * challenge additionally only shows if the *viewer* also participates in
- * that challenge (posting in a challenge someone isn't part of shouldn't
- * leak into their friends' feeds just because they're friends with a
- * member).
+ * nothing at all if they have no friends yet. A friend's check-in linked to
+ * one or more challenges additionally only shows if the *viewer* also
+ * participates in at least one of them (posting in a challenge someone
+ * isn't part of shouldn't leak into their friends' feeds just because
+ * they're friends with a member) -- a check-in with no challenge links at
+ * all is always visible to friends.
  */
 export async function getFeedCheckins(
   currentUserId: string,
@@ -102,7 +105,10 @@ export async function getFeedCheckins(
       where: {
         ...COMPLETED,
         userId: { in: friendIds },
-        OR: [{ challengeId: null }, { challengeId: { in: myChallengeIds } }],
+        OR: [
+          { challenges: { none: {} } },
+          { challenges: { some: { challengeId: { in: myChallengeIds } } } },
+        ],
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -162,7 +168,7 @@ export async function getChallengeCheckinDatesByMember(
   challengeId: string
 ): Promise<Map<string, Date[]>> {
   const rows = await prisma.checkin.findMany({
-    where: { challengeId, ...COMPLETED },
+    where: { ...COMPLETED, challenges: { some: { challengeId } } },
     select: { userId: true, createdAt: true },
   });
 
@@ -175,7 +181,11 @@ export async function getChallengeCheckinDatesByMember(
   return byUser;
 }
 
-/** All check-ins posted under a challenge, used on the challenge detail page. */
+/**
+ * All check-ins posted under a challenge, used on the challenge detail
+ * page. A check-in linked to several challenges shows up on each of their
+ * pages -- it's still a single post, just cross-listed (see CheckinChallenge).
+ */
 export async function getChallengeCheckins(
   challengeId: string,
   currentUserId: string,
@@ -183,7 +193,7 @@ export async function getChallengeCheckins(
 ): Promise<FeedCheckin[]> {
   const [checkins, managedChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
-      where: { challengeId, ...COMPLETED },
+      where: { ...COMPLETED, challenges: { some: { challengeId } } },
       orderBy: { createdAt: "desc" },
       take: limit,
       include: feedCheckinInclude(currentUserId),
@@ -197,24 +207,20 @@ export async function getChallengeCheckins(
 export type ActiveCheckin = {
   id: string;
   createdAt: Date;
-  challengeId: string | null;
-  challengeName: string | null;
 };
 
-/** The user's in-progress check-in (started, not yet checked out), if any -- drives the Feed banner's timer/"Finalizar" state. At most one at a time, see startCheckin. */
+/**
+ * The user's in-progress check-in (started, not yet checked out), if any --
+ * drives the Feed banner's timer/"Finalizar" state. At most one at a time,
+ * see startCheckin. Which challenges (if any) it'll be linked to is chosen
+ * at check-out, not here, so there's nothing challenge-related to select yet.
+ */
 export async function getActiveCheckin(userId: string): Promise<ActiveCheckin | null> {
-  const checkin = await prisma.checkin.findFirst({
+  return prisma.checkin.findFirst({
     where: { userId, checkedOutAt: null },
     orderBy: { createdAt: "desc" },
-    select: { id: true, createdAt: true, challengeId: true, challenge: { select: { name: true } } },
+    select: { id: true, createdAt: true },
   });
-  if (!checkin) return null;
-  return {
-    id: checkin.id,
-    createdAt: checkin.createdAt,
-    challengeId: checkin.challengeId,
-    challengeName: checkin.challenge?.name ?? null,
-  };
 }
 
 /** Total hours studied this calendar month, summed from completed check-ins' check-in-to-check-out duration. Drives the profile's "Este mês" stat. */

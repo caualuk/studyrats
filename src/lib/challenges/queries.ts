@@ -208,7 +208,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
     prisma.challenge.findUnique({ where: { id: challengeId }, select: { ownerId: true } }),
     prisma.checkin.groupBy({
       by: ["userId"],
-      where: { challengeId, checkedOutAt: { not: null } },
+      where: { checkedOutAt: { not: null }, challenges: { some: { challengeId } } },
       _count: { id: true },
     }),
   ]);

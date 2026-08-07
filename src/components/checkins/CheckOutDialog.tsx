@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
+import type { FormEvent } from "react";
 import { checkOutCheckin } from "@/lib/checkins/actions";
 import { setInputFile } from "@/lib/fileInput";
 import { Button } from "@/components/ui/Button";
@@ -8,40 +9,74 @@ import { Card } from "@/components/ui/Card";
 import { ImageCropper } from "@/components/ui/ImageCropper";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { cn } from "@/lib/cn";
+import type { ChallengeOption } from "@/lib/challenges/queries";
+import type { ActiveCheckin } from "@/lib/checkins/queries";
+import type { FormState } from "@/lib/validations";
 
-/** Finishes an in-progress check-in: title, description, and the proof photo -- open from the Feed banner's "Finalizar check-out". */
+/**
+ * Finishes an in-progress check-in: title, description, the proof photo,
+ * and which challenges (zero or more) to post it under -- open from the
+ * Feed banner's "Finalizar check-out". On success, hands the elapsed time
+ * back via `onCheckedOut` (for the success modal) instead of showing one
+ * itself, since that modal needs to survive this dialog's parent unmounting
+ * once the check-in is no longer "active" -- see StreakBanner.
+ *
+ * Deliberately not built on useActionState: its success handling runs in an
+ * effect *after* the state update commits, and the checkOutCheckin action's
+ * own revalidatePath can cause this dialog's parent (ActiveSession) to
+ * unmount -- once activeCheckin flips to null -- before that effect gets a
+ * chance to run, silently dropping the success callback despite the
+ * check-in having saved correctly. Calling the action directly and firing
+ * the callback right after awaiting it sidesteps that race.
+ */
 export function CheckOutDialog({
-  checkinId,
+  checkin,
+  challenges,
   open,
   onClose,
+  onCheckedOut,
 }: {
-  checkinId: string;
+  checkin: ActiveCheckin;
+  challenges: ChallengeOption[];
   open: boolean;
   onClose: () => void;
+  onCheckedOut: (elapsedMs: number) => void;
 }) {
-  const checkOutThisCheckin = checkOutCheckin.bind(null, checkinId);
-  const [state, formAction, pending] = useActionState(checkOutThisCheckin, undefined);
+  const [state, setState] = useState<FormState>(undefined);
+  const [pending, startTransition] = useTransition();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (state?.success) onClose();
-  }, [state, onClose]);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(async () => {
+      const result = await checkOutCheckin(checkin.id, undefined, formData);
+      if (result?.success) {
+        onCheckedOut(Date.now() - checkin.createdAt.getTime());
+        onClose();
+        return;
+      }
+      setState(result);
+    });
+  }
 
   return (
-    <Modal open={open} onClose={onClose}>
+    <Modal
+      open={open}
+      onClose={() => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        onClose();
+      }}
+    >
       <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
         <h2 className="mb-1 text-lg font-bold">Finalizar check-in</h2>
         <p className="mb-5 text-xs text-white/45">Todo check-in vem com foto. Sem foto, não conta.</p>
-        <form ref={formRef} action={formAction} className="flex flex-col gap-3">
+        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label
             htmlFor="checkout-photo"
             className="photo-placeholder relative flex h-36 w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-border-strong"
@@ -105,6 +140,44 @@ export function CheckOutDialog({
               error={state?.errors?.description?.[0]}
             />
           </div>
+
+          {challenges.length > 0 && (
+            <div>
+              <Label>Marcar em desafios (opcional)</Label>
+              <div className="flex flex-col gap-1.5">
+                {challenges.map((c) => {
+                  const checked = selectedChallengeIds.includes(c.id);
+                  return (
+                    <label
+                      key={c.id}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors",
+                        checked
+                          ? "border-accent bg-accent/10 text-white"
+                          : "border-border-strong bg-white/5 text-white/60 hover:bg-white/10"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        name="challengeIds"
+                        value={c.id}
+                        checked={checked}
+                        onChange={(event) =>
+                          setSelectedChallengeIds((current) =>
+                            event.target.checked
+                              ? [...current, c.id]
+                              : current.filter((id) => id !== c.id)
+                          )
+                        }
+                        className="accent-accent"
+                      />
+                      {c.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {state?.message && (
             <p className="text-xs text-red-400" role="alert">

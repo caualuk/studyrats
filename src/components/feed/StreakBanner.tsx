@@ -5,6 +5,7 @@ import { cancelCheckin, startCheckin } from "@/lib/checkins/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CheckOutDialog } from "@/components/checkins/CheckOutDialog";
+import { CheckoutSuccessModal } from "@/components/checkins/CheckoutSuccessModal";
 import { formatElapsed } from "@/lib/dates";
 import type { ChallengeOption } from "@/lib/challenges/queries";
 import type { ActiveCheckin } from "@/lib/checkins/queries";
@@ -40,26 +41,41 @@ export function StreakBanner({
   challenges: ChallengeOption[];
   activeCheckin: ActiveCheckin | null;
 }) {
+  // Lives here, not inside ActiveSession/CheckOutDialog: once check-out
+  // succeeds, `activeCheckin` becomes null on the next render (revalidated
+  // from the server) and ActiveSession unmounts -- a success modal owned by
+  // it would vanish before the user ever saw it.
+  const [justFinishedMs, setJustFinishedMs] = useState<number | null>(null);
+
   return (
-    <Card className="mb-9 flex items-center justify-between px-6 py-4">
-      <StreakLabel status={status} />
-      {activeCheckin ? (
-        <ActiveSession checkin={activeCheckin} />
-      ) : (
-        <StartCheckinControl challenges={challenges} />
+    <>
+      <Card className="mb-9 flex items-center justify-between px-6 py-4">
+        <StreakLabel status={status} />
+        {activeCheckin ? (
+          <ActiveSession
+            checkin={activeCheckin}
+            challenges={challenges}
+            onCheckedOut={setJustFinishedMs}
+          />
+        ) : (
+          <StartCheckinControl />
+        )}
+      </Card>
+
+      {justFinishedMs !== null && (
+        <CheckoutSuccessModal elapsedMs={justFinishedMs} onClose={() => setJustFinishedMs(null)} />
       )}
-    </Card>
+    </>
   );
 }
 
-function StartCheckinControl({ challenges }: { challenges: ChallengeOption[] }) {
-  const [challengeId, setChallengeId] = useState("");
+function StartCheckinControl() {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleStart() {
     startTransition(async () => {
-      const result = await startCheckin(challengeId || undefined);
+      const result = await startCheckin();
       setMessage(result.message ?? null);
     });
   }
@@ -67,21 +83,6 @@ function StartCheckinControl({ challenges }: { challenges: ChallengeOption[] }) 
   return (
     <div className="flex items-center gap-2">
       {message && <span className="text-xs text-red-400">{message}</span>}
-      {challenges.length > 0 && (
-        <select
-          value={challengeId}
-          onChange={(event) => setChallengeId(event.target.value)}
-          aria-label="Desafio (opcional)"
-          className="rounded-full border border-border-strong bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-accent"
-        >
-          <option value="">Feed geral</option>
-          {challenges.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      )}
       <Button size="sm" onClick={handleStart} disabled={isPending}>
         {isPending ? "Iniciando..." : "Iniciar check-in"}
       </Button>
@@ -89,7 +90,15 @@ function StartCheckinControl({ challenges }: { challenges: ChallengeOption[] }) 
   );
 }
 
-function ActiveSession({ checkin }: { checkin: ActiveCheckin }) {
+function ActiveSession({
+  checkin,
+  challenges,
+  onCheckedOut,
+}: {
+  checkin: ActiveCheckin;
+  challenges: ChallengeOption[];
+  onCheckedOut: (elapsedMs: number) => void;
+}) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [now, setNow] = useState(() => Date.now());
@@ -109,9 +118,6 @@ function ActiveSession({ checkin }: { checkin: ActiveCheckin }) {
     <div className="flex items-center gap-4">
       <span className="text-sm text-accent">
         Estudando há {formatElapsed(now - checkin.createdAt.getTime())}
-        {checkin.challengeName && (
-          <span className="text-white/45"> · {checkin.challengeName}</span>
-        )}
       </span>
       <button
         type="button"
@@ -124,7 +130,13 @@ function ActiveSession({ checkin }: { checkin: ActiveCheckin }) {
       <Button size="sm" onClick={() => setCheckoutOpen(true)}>
         Finalizar check-out
       </Button>
-      <CheckOutDialog checkinId={checkin.id} open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
+      <CheckOutDialog
+        checkin={checkin}
+        challenges={challenges}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        onCheckedOut={onCheckedOut}
+      />
     </div>
   );
 }

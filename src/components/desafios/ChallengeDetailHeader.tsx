@@ -26,8 +26,12 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
             <EditChallengeDialog
               challengeId={challenge.id}
               name={challenge.name}
+              description={challenge.description}
               coverUrl={challenge.coverUrl}
               coverColor={challenge.coverColor}
+              startDate={challenge.startDate}
+              endDate={challenge.endDate}
+              isOwner={challenge.isOwner}
             />
           )}
         </div>

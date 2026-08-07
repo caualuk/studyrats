@@ -1,24 +1,34 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
-import { updateChallenge } from "@/lib/challenges/actions";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { deleteChallenge, updateChallenge } from "@/lib/challenges/actions";
 import { CHALLENGE_COVER_COLORS } from "@/lib/challenges/coverColors";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input, Label } from "@/components/ui/Input";
+import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { toDateKey } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 
 export function EditChallengeDialog({
   challengeId,
   name,
+  description,
   coverUrl,
   coverColor,
+  startDate,
+  endDate,
+  isOwner,
 }: {
   challengeId: string;
   name: string;
+  description: string | null;
   coverUrl: string | null;
   coverColor: string | null;
+  startDate: Date;
+  endDate: Date | null;
+  /** Only the owner can delete the challenge -- see deleteChallenge. */
+  isOwner: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -28,15 +38,19 @@ export function EditChallengeDialog({
         Editar
       </Button>
       <Modal open={open} onClose={() => setOpen(false)}>
-        <Card className="px-6 py-6 text-left">
+        <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
           <h2 className="mb-4 text-lg font-bold">Editar desafio</h2>
           <EditChallengeForm
             challengeId={challengeId}
             name={name}
+            description={description}
             coverUrl={coverUrl}
             coverColor={coverColor}
+            startDate={startDate}
+            endDate={endDate}
             onSaved={() => setOpen(false)}
           />
+          {isOwner && <DeleteChallengeSection challengeId={challengeId} />}
         </Card>
       </Modal>
     </>
@@ -46,14 +60,20 @@ export function EditChallengeDialog({
 function EditChallengeForm({
   challengeId,
   name,
+  description,
   coverUrl,
   coverColor,
+  startDate,
+  endDate,
   onSaved,
 }: {
   challengeId: string;
   name: string;
+  description: string | null;
   coverUrl: string | null;
   coverColor: string | null;
+  startDate: Date;
+  endDate: Date | null;
   onSaved: () => void;
 }) {
   const [state, formAction, pending] = useActionState(updateChallenge, undefined);
@@ -132,6 +152,38 @@ function EditChallengeForm({
         <Input id="name" name="name" defaultValue={name} error={state?.errors?.name?.[0]} />
       </div>
 
+      <div>
+        <Label htmlFor="description">Descrição (opcional)</Label>
+        <Textarea
+          id="description"
+          name="description"
+          rows={2}
+          defaultValue={description ?? ""}
+          error={state?.errors?.description?.[0]}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="startDate">Começa em</Label>
+        <Input
+          id="startDate"
+          name="startDate"
+          type="date"
+          defaultValue={toDateKey(startDate)}
+          error={state?.errors?.startDate?.[0]}
+        />
+      </div>
+      <div>
+        <Label htmlFor="endDate">Termina em (opcional)</Label>
+        <Input
+          id="endDate"
+          name="endDate"
+          type="date"
+          defaultValue={endDate ? toDateKey(endDate) : ""}
+          error={state?.errors?.endDate?.[0]}
+        />
+      </div>
+
       {state?.message && (
         <p className="text-[11px] text-red-400" role="alert">
           {state.message}
@@ -142,5 +194,59 @@ function EditChallengeForm({
         {pending ? "Salvando..." : "Salvar alterações"}
       </Button>
     </form>
+  );
+}
+
+function DeleteChallengeSection({ challengeId }: { challengeId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleDelete() {
+    startTransition(async () => {
+      const result = await deleteChallenge(challengeId);
+      // Only returns on failure -- success redirects away from this page entirely.
+      if (result?.message) setMessage(result.message);
+    });
+  }
+
+  return (
+    <div className="mt-5 border-t border-border pt-4">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="text-[11px] text-red-400/70 transition-colors hover:text-red-400"
+        >
+          Excluir desafio
+        </button>
+      ) : (
+        <div>
+          <p className="mb-2 text-[11px] text-white/60">
+            Excluir <strong>apaga o desafio pra todo mundo</strong>. Os check-ins já feitos
+            continuam existindo, só deixam de ficar vinculados a ele. Essa ação não pode ser
+            desfeita.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDelete}
+              disabled={isPending}
+              className="bg-red-500 text-white hover:bg-red-600 disabled:hover:bg-red-500"
+            >
+              {isPending ? "Excluindo..." : "Confirmar exclusão"}
+            </Button>
+          </div>
+          {message && (
+            <p className="mt-2 text-[11px] text-red-400" role="alert">
+              {message}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

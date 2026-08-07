@@ -93,8 +93,8 @@ model FriendInvite {
 
 model Checkin {
   id          String   @id @default(cuid())
-  // Null until check-out: a check-in starts with just userId/challengeId/
-  // createdAt, and title/description/photoUrl are only filled in (together,
+  // Null until check-out: a check-in starts with just userId/createdAt, and
+  // title/description/photoUrl/challenge links are only filled in (together,
   // atomically) when the session is checked out -- see checkOutCheckin.
   title       String?
   description String?
@@ -111,8 +111,10 @@ model Checkin {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  challengeId String?
-  challenge   Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  // Many-to-many: one check-in can be posted under several challenges at
+  // once (chosen at check-out) and shows as a single post everywhere, not
+  // duplicated per challenge -- see CheckinChallenge.
+  challenges CheckinChallenge[]
 
   likes    Like[]
   comments Comment[]
@@ -124,8 +126,26 @@ model Checkin {
   studyDay StudyDay?
 
   @@index([userId, createdAt])
-  @@index([challengeId])
   @@map("checkins")
+}
+
+// Join table for Checkin<->Challenge (many-to-many): a single check-in can
+// be linked to several challenges (see checkOutCheckin), so a friend who
+// shares two challenges in common with the author still sees one post, not
+// a duplicate per challenge -- callers query/group through this table
+// instead of a scalar Checkin.challengeId.
+model CheckinChallenge {
+  id String @id @default(cuid())
+
+  checkinId String
+  checkin   Checkin @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([checkinId, challengeId])
+  @@index([challengeId])
+  @@map("checkin_challenges")
 }
 
 // One row per user per calendar day they studied -- the sole source of
@@ -202,8 +222,8 @@ model Challenge {
   ownerId String
   owner   User   @relation("ChallengeOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  members  ChallengeMember[]
-  checkins Checkin[]
+  members      ChallengeMember[]
+  checkinLinks CheckinChallenge[]
 
   @@map("challenges")
 }

@@ -8,10 +8,10 @@ import { CheckinDetailModal } from "@/components/feed/CheckinDetailModal";
 import type { FeedCheckin } from "@/lib/checkins/queries";
 
 /**
- * The check-in's photo + tag badge + (owner-only) edit/delete icons.
- * Clicking the photo opens the full detail modal -- a plain div (not a
- * `<button>`) so the icon buttons can live inside it without illegally
- * nesting interactive elements.
+ * The check-in's photo + one badge per linked challenge (or "Check-in
+ * livre" if none) + (owner-only) edit/delete icons. Clicking the photo
+ * opens the full detail modal -- a plain div (not a `<button>`) so the icon
+ * buttons can live inside it without illegally nesting interactive elements.
  */
 export function CheckinCardPhoto({ checkin }: { checkin: FeedCheckin }) {
   const [detailOpen, setDetailOpen] = useState(false);
@@ -37,7 +37,13 @@ export function CheckinCardPhoto({ checkin }: { checkin: FeedCheckin }) {
           label="foto do check-in"
           className="h-[150px] w-full"
         >
-          <Badge className="absolute bottom-2.5 left-2.5">{checkin.tag}</Badge>
+          <div className="absolute bottom-2.5 left-2.5 flex max-w-[calc(100%-2rem)] flex-wrap gap-1">
+            {checkin.challenges.length === 0 ? (
+              <Badge>Check-in livre</Badge>
+            ) : (
+              checkin.challenges.map((c) => <Badge key={c.id}>{c.name}</Badge>)
+            )}
+          </div>
           {checkin.canDelete && <CheckinCardActions checkin={checkin} />}
         </PhotoPlaceholder>
       </div>

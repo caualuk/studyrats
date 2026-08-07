@@ -68,6 +68,9 @@ export type ChallengeCreateInput = z.infer<typeof ChallengeCreateSchema>;
 
 export const ChallengeUpdateSchema = z.object({
   name: z.string().trim().min(3, { error: "Dê um nome para o desafio." }).max(60),
+  description: z.string().trim().max(300).optional().or(z.literal("")),
+  startDate: z.string().trim().optional().or(z.literal("")),
+  endDate: z.string().trim().optional().or(z.literal("")),
   coverColor: z
     .string()
     .trim()

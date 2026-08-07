@@ -10,13 +10,17 @@ import { CheckoutSchema, type FormState } from "@/lib/validations";
 
 const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios"];
 
+function revalidateChallenges(challengeIds: string[]) {
+  for (const id of challengeIds) revalidatePath(`/desafios/${id}`);
+}
+
 /**
- * Starts a check-in: just a timestamp and (optionally) which challenge it's
- * under -- title, description, and the proof photo are all collected later,
- * at check-out (see checkOutCheckin). Only one check-in can be in progress
- * at a time per user.
+ * Starts a check-in: just a timestamp. Title, description, the proof
+ * photo, and which challenges (if any) it's posted under are all collected
+ * later, at check-out (see checkOutCheckin). Only one check-in can be in
+ * progress at a time per user.
  */
-export async function startCheckin(challengeId?: string): Promise<{ message?: string }> {
+export async function startCheckin(): Promise<{ message?: string }> {
   const session = await verifySession();
 
   const active = await prisma.checkin.findFirst({
@@ -27,23 +31,8 @@ export async function startCheckin(challengeId?: string): Promise<{ message?: st
     return { message: "Você já tem um check-in em andamento." };
   }
 
-  if (challengeId) {
-    // Server Actions are reachable via direct POST, not just through this
-    // form -- make sure the user actually belongs to the challenge they
-    // claim to be checking into, rather than trusting the submitted id.
-    const membership = await prisma.challengeMember.findUnique({
-      where: { challengeId_userId: { challengeId, userId: session.userId } },
-      select: { challengeId: true },
-    });
-    if (!membership) {
-      return { message: "Você não participa desse desafio." };
-    }
-  }
-
   try {
-    await prisma.checkin.create({
-      data: { userId: session.userId, challengeId: challengeId || null },
-    });
+    await prisma.checkin.create({ data: { userId: session.userId } });
   } catch {
     return {
       message:
@@ -52,21 +41,22 @@ export async function startCheckin(challengeId?: string): Promise<{ message?: st
   }
 
   revalidatePath("/feed");
-  if (challengeId) revalidatePath(`/desafios/${challengeId}`);
   return {};
 }
 
 /**
  * Cancels an in-progress check-in without checking out (e.g. started by
  * mistake). Never touches study_days -- only a completed check-out earns a
- * study day, so there's nothing to undo there.
+ * study day, so there's nothing to undo there. An in-progress check-in was
+ * never linked to any challenge yet either (that's chosen at check-out), so
+ * there's nothing to revalidate beyond the feed.
  */
 export async function cancelCheckin(checkinId: string): Promise<{ message?: string }> {
   const session = await verifySession();
 
   const checkin = await prisma.checkin.findUnique({
     where: { id: checkinId },
-    select: { userId: true, checkedOutAt: true, challengeId: true },
+    select: { userId: true, checkedOutAt: true },
   });
   if (!checkin || checkin.userId !== session.userId || checkin.checkedOutAt) {
     return { message: "Não foi possível cancelar esse check-in." };
@@ -79,15 +69,14 @@ export async function cancelCheckin(checkinId: string): Promise<{ message?: stri
   }
 
   revalidatePath("/feed");
-  if (checkin.challengeId) revalidatePath(`/desafios/${checkin.challengeId}`);
   return {};
 }
 
 /**
- * Finishes an in-progress check-in: title, description, and the proof photo
- * are all required here, not at start -- this is also the moment the
- * streak is earned (the study_days upsert createCheckin used to do lives
- * here now instead).
+ * Finishes an in-progress check-in: title, description, the proof photo,
+ * and which challenges (zero or more) it's posted under are all collected
+ * here, not at start -- this is also the moment the streak is earned (the
+ * study_days upsert createCheckin used to do lives here now instead).
  */
 export async function checkOutCheckin(
   checkinId: string,
@@ -98,7 +87,7 @@ export async function checkOutCheckin(
 
   const checkin = await prisma.checkin.findUnique({
     where: { id: checkinId },
-    select: { userId: true, checkedOutAt: true, challengeId: true, createdAt: true },
+    select: { userId: true, checkedOutAt: true, createdAt: true },
   });
   if (!checkin || checkin.userId !== session.userId) {
     return { message: "Você não pode finalizar esse check-in." };
@@ -120,6 +109,21 @@ export async function checkOutCheckin(
     return { message: "Envie uma foto. Sem foto, não conta." };
   }
 
+  // Server Actions are reachable via direct POST, not just through this
+  // form -- only keep challenge ids the user actually belongs to, rather
+  // than trusting whatever was submitted.
+  const requestedChallengeIds = formData.getAll("challengeIds").filter(
+    (v): v is string => typeof v === "string" && v.length > 0
+  );
+  let challengeIds: string[] = [];
+  if (requestedChallengeIds.length > 0) {
+    const memberships = await prisma.challengeMember.findMany({
+      where: { userId: session.userId, challengeId: { in: requestedChallengeIds } },
+      select: { challengeId: true },
+    });
+    challengeIds = memberships.map((m) => m.challengeId);
+  }
+
   let photoUrl: string;
   try {
     photoUrl = await savePhotoUpload(photo, "checkins");
@@ -135,13 +139,20 @@ export async function checkOutCheckin(
 
   try {
     // The streak lives entirely in study_days, not in whether a check-in
-    // post exists -- finishing the post and ensuring the study day are two
-    // separate writes, done together so they can never drift apart.
+    // post exists -- finishing the post, linking its challenges, and
+    // ensuring the study day are all done together so they can never drift
+    // apart.
     await prisma.$transaction(async (tx) => {
       await tx.checkin.update({
         where: { id: checkinId },
         data: { title, description: description || null, photoUrl, checkedOutAt: new Date() },
       });
+
+      if (challengeIds.length > 0) {
+        await tx.checkinChallenge.createMany({
+          data: challengeIds.map((challengeId) => ({ checkinId, challengeId })),
+        });
+      }
 
       await tx.studyDay.upsert({
         where: { userId_date: { userId: session.userId, date: today } },
@@ -159,7 +170,7 @@ export async function checkOutCheckin(
   }
 
   for (const path of AFFECTED_PATHS) revalidatePath(path);
-  if (checkin.challengeId) revalidatePath(`/desafios/${checkin.challengeId}`);
+  revalidateChallenges(challengeIds);
 
   return { success: true };
 }
@@ -168,8 +179,9 @@ const CheckinEditSchema = CheckoutSchema.pick({ title: true, description: true }
 
 /**
  * Edits a completed check-in's content (and optionally swaps its photo).
- * Deliberately never touches study_days -- editing a post, even changing
- * its title or photo entirely, must never affect the streak either way.
+ * Deliberately never touches study_days or its challenge links -- editing a
+ * post, even changing its title or photo entirely, must never affect the
+ * streak or which challenges it counts for.
  */
 export async function editCheckin(
   checkinId: string,
@@ -180,7 +192,7 @@ export async function editCheckin(
 
   const existing = await prisma.checkin.findUnique({
     where: { id: checkinId },
-    select: { userId: true, challengeId: true, checkedOutAt: true },
+    select: { userId: true, checkedOutAt: true, challenges: { select: { challengeId: true } } },
   });
   if (!existing || existing.userId !== session.userId || !existing.checkedOutAt) {
     return { message: "Você não pode editar esse check-in." };
@@ -221,14 +233,14 @@ export async function editCheckin(
   }
 
   for (const path of AFFECTED_PATHS) revalidatePath(path);
-  if (existing.challengeId) revalidatePath(`/desafios/${existing.challengeId}`);
+  revalidateChallenges(existing.challenges.map((c) => c.challengeId));
 
   return { success: true };
 }
 
 /**
  * Deletes a completed check-in post -- either the author, or an owner/admin
- * of the challenge it was posted under moderating an offensive post (streak
+ * of *any* challenge it's linked to moderating an offensive post (streak
  * bookkeeping below always follows the *author*, never the deleter). An
  * in-progress check-in (no checkedOutAt yet) is cancelled instead, see
  * cancelCheckin -- it never earned a study day, so there's nothing here to
@@ -247,17 +259,28 @@ export async function deleteCheckin(checkinId: string): Promise<{ message?: stri
 
   const checkin = await prisma.checkin.findUnique({
     where: { id: checkinId },
-    select: { userId: true, createdAt: true, challengeId: true, checkedOutAt: true },
+    select: {
+      userId: true,
+      createdAt: true,
+      checkedOutAt: true,
+      challenges: { select: { challengeId: true } },
+    },
   });
   if (!checkin || !checkin.checkedOutAt) {
     return { message: "Você não pode excluir esse check-in." };
   }
 
+  const challengeIds = checkin.challenges.map((c) => c.challengeId);
   const isOwner = checkin.userId === session.userId;
-  const canModerate =
-    !isOwner && checkin.challengeId
-      ? await canManageChallenge(checkin.challengeId, session.userId)
-      : false;
+  let canModerate = false;
+  if (!isOwner) {
+    for (const challengeId of challengeIds) {
+      if (await canManageChallenge(challengeId, session.userId)) {
+        canModerate = true;
+        break;
+      }
+    }
+  }
   if (!isOwner && !canModerate) {
     return { message: "Você não pode excluir esse check-in." };
   }
@@ -292,7 +315,7 @@ export async function deleteCheckin(checkinId: string): Promise<{ message?: stri
   }
 
   for (const path of AFFECTED_PATHS) revalidatePath(path);
-  if (checkin.challengeId) revalidatePath(`/desafios/${checkin.challengeId}`);
+  revalidateChallenges(challengeIds);
 
   return {};
 }
