@@ -8,7 +8,7 @@ import { decryptSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 // cookie, never the database -- real authorization still happens in the
 // Data Access Layer (see src/lib/auth/dal.ts) close to the data itself.
 const PROTECTED_PREFIXES = ["/feed", "/ranking", "/desafios", "/perfil", "/amigos"];
-const AUTH_ROUTES = ["/login", "/registro", "/esqueci-senha"];
+const AUTH_ROUTES = ["/login", "/registro"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

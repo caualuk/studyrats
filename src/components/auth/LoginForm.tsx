@@ -31,14 +31,7 @@ export function LoginForm({ next }: { next?: string }) {
           />
         </div>
         <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <Label htmlFor="password" className="mb-0">
-              Senha
-            </Label>
-            <Link href="/esqueci-senha" className="text-[11px] text-white/45 hover:text-white/70">
-              Esqueceu a senha?
-            </Link>
-          </div>
+          <Label htmlFor="password">Senha</Label>
           <Input
             id="password"
             name="password"

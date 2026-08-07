@@ -102,24 +102,6 @@ export const UpdateBioSchema = z.object({
 
 export type UpdateBioInput = z.infer<typeof UpdateBioSchema>;
 
-export const RequestPasswordResetSchema = z.object({
-  email: z.email({ error: "Informe um e-mail válido." }).trim(),
-});
-
-export type RequestPasswordResetInput = z.infer<typeof RequestPasswordResetSchema>;
-
-export const ResetPasswordSchema = z
-  .object({
-    password,
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    error: "As senhas não coincidem.",
-    path: ["confirmPassword"],
-  });
-
-export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
-
 /** Shared shape for useActionState-backed forms across the app. */
 export type FormState = {
   errors?: Record<string, string[]>;
