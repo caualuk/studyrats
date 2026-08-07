@@ -9,7 +9,6 @@ import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
 import { LikeButton } from "@/components/feed/LikeButton";
 import { CheckinComments } from "@/components/feed/CheckinComments";
 import { EditCheckinDialog } from "@/components/feed/EditCheckinDialog";
-import { DeleteCheckinButton } from "@/components/feed/DeleteCheckinButton";
 import type { FeedCheckin } from "@/lib/checkins/queries";
 
 /**
@@ -17,8 +16,9 @@ import type { FeedCheckin } from "@/lib/checkins/queries";
  * like, and comments (list + form). Shared by the feed's "Comentar" button
  * and the challenge "pista"'s runner photos, so both open the exact same
  * view. Only mounts (and only fetches comments) while `open` is true --
- * Modal itself renders nothing when closed. Owners additionally get
- * Editar/Excluir controls.
+ * Modal itself renders nothing when closed. Owners additionally get an
+ * Editar control here -- deleting lives on the card's hover trash icon
+ * instead (CheckinCardDeleteButton), not duplicated in this modal.
  */
 export function CheckinDetailModal({
   checkin,
@@ -65,16 +65,13 @@ export function CheckinDetailModal({
                 initialCount={checkin.likesCount}
               />
               {checkin.isOwner && (
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setEditOpen(true)}
-                    className="text-[13px] text-white/45 transition-colors hover:text-white/70"
-                  >
-                    Editar
-                  </button>
-                  <DeleteCheckinButton checkinId={checkin.id} onDeleted={onClose} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  className="text-[13px] text-white/45 transition-colors hover:text-white/70"
+                >
+                  Editar
+                </button>
               )}
             </div>
             <CheckinComments checkinId={checkin.id} />
