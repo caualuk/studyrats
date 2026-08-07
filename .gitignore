@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user-uploaded photos (checked-in files stay local; keep the folder via .gitkeep)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# sqlite database file (DATABASE_URL is resolved relative to the project root)
+/*.db
+/*.db-journal

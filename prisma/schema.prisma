@@ -1,0 +1,214 @@
+// Prisma schema for StudyRats.
+//
+// Connected to Supabase Postgres.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma ORM 7: connection URLs no longer live here. `DATABASE_URL` is read
+// from prisma.config.ts (for the CLI/migrations) and from src/lib/prisma.ts
+// (for the driver adapter Prisma Client uses at runtime).
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  email        String   @unique
+  passwordHash      String
+  avatarUrl         String?
+  bio               String?
+  // Set whenever the password changes (including via reset). Sessions
+  // issued before this timestamp are treated as invalid -- see
+  // src/lib/auth/dal.ts -- so a stolen cookie stops working the moment the
+  // real owner resets their password.
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+
+  checkins             Checkin[]
+  studyDays            StudyDay[]
+  ownedChallenges      Challenge[]       @relation("ChallengeOwner")
+  challengeMemberships ChallengeMember[]
+  likes                Like[]
+  comments             Comment[]
+
+  friendshipsOwned    Friendship[]   @relation("FriendshipsOwned")
+  friendshipsAsFriend Friendship[]   @relation("FriendshipsAsFriend")
+  friendInvites       FriendInvite[]
+
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  // Only a SHA-256 hash of the token is stored -- same reasoning as
+  // password hashing: a DB leak alone shouldn't hand out usable reset
+  // links. The raw token only ever exists in the emailed link.
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation("FriendshipsOwned", fields: [userId], references: [id], onDelete: Cascade)
+
+  friendId String
+  friend   User   @relation("FriendshipsAsFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  // One row per direction (A->B and B->A), so "my friends" is always a
+  // simple `where: { userId }` query with no need to figure out which side
+  // of the pair the current user is on.
+  @@unique([userId, friendId])
+  @@map("friendships")
+}
+
+// A permanent, reusable "add me" link per user (one row per user, created
+// on first use) -- not a single-use invite. Accepting is idempotent (see
+// acceptFriendInvite), so reusability doesn't risk duplicate friendships.
+model FriendInvite {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  inviterId String
+  inviter   User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@map("friend_invites")
+}
+
+model Checkin {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  photoUrl    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  challengeId String?
+  challenge   Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  likes    Like[]
+  comments Comment[]
+  // The study day this check-in *originally* established, if any -- see
+  // StudyDay. Deleting this check-in nulls this side automatically
+  // (onDelete: SetNull on StudyDay.sourceCheckin); the study day itself
+  // survives, since the streak logic in src/lib/checkins/actions.ts decides
+  // separately whether the day still counts.
+  studyDay StudyDay?
+
+  @@index([userId, createdAt])
+  @@index([challengeId])
+  @@map("checkins")
+}
+
+// One row per user per calendar day they studied -- the sole source of
+// truth for streaks, decoupled from Checkin so deleting an old post never
+// changes the streak. `date` is a plain "YYYY-MM-DD" string rather than a
+// DateTime: it's a calendar-day key, not an instant, so storing it that way
+// sidesteps any local-vs-UTC round-trip ambiguity when read back. See
+// src/lib/checkins/actions.ts for how rows are created/removed.
+model StudyDay {
+  id        String   @id @default(cuid())
+  date      String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The check-in that first earned this study day. Nullable and unique: at
+  // most one study day per check-in, and the pointer is cleared (not
+  // cascaded) if that check-in is later deleted -- the day was already
+  // earned and stays earned.
+  sourceCheckinId String?  @unique
+  sourceCheckin   Checkin? @relation(fields: [sourceCheckinId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, date])
+  @@map("study_days")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  checkinId String
+  checkin   Checkin @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([checkinId, userId])
+  @@map("likes")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  checkinId String
+  checkin   Checkin @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([checkinId, createdAt])
+  @@map("comments")
+}
+
+model Challenge {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  coverUrl    String?
+  // Fallback solid-color cover, picked when the owner skips uploading a
+  // cover photo. Ignored once `coverUrl` is set -- see PhotoPlaceholder.
+  coverColor  String?
+  code        String    @unique
+  isPublic    Boolean   @default(false)
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+
+  ownerId String
+  owner   User   @relation("ChallengeOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members  ChallengeMember[]
+  checkins Checkin[]
+
+  @@map("challenges")
+}
+
+model ChallengeMember {
+  id       String   @id @default(cuid())
+  joinedAt DateTime @default(now())
+  // The owner (Challenge.ownerId) always has full permissions regardless of
+  // this flag -- it only grants the *same* permissions to other members.
+  isAdmin  Boolean  @default(false)
+
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@map("challenge_members")
+}

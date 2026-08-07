@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * StudyRats design tokens.
+ * Ported 1:1 from the original studyrats.dc.html mockup: near-black
+ * background, translucent white "glass" cards, and a single mint-green
+ * accent used for anything interactive or "active".
+ */
+@theme {
+  --color-bg: #0a0a0c;
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-surface-strong: rgba(255, 255, 255, 0.05);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.15);
+  --color-accent: #7eefc9;
+  --color-accent-hover: #9df6d9;
+  --color-accent-ink: #0a0a0c;
+  --color-placeholder-a: #1c1c22;
+  --color-placeholder-b: #232329;
+
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/*
+ * Tailwind v4 puts its utilities in `@layer utilities`. Un-layered CSS
+ * always wins over ANY `@layer`, regardless of selector specificity -- so
+ * plain top-level rules here would silently beat utility classes like
+ * `text-white` on the very same element (e.g. a <Link> styled as a
+ * button). Wrapping these in `@layer base` puts them below `utilities` in
+ * Tailwind's cascade, exactly where a browser default/reset belongs.
+ */
+@layer base {
+  body {
+    background: var(--color-bg);
+    color: #fff;
+    font-family: var(--font-sans);
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--color-accent-hover);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Repeating diagonal-stripe placeholder used for "photo not uploaded yet" UI. */
+.photo-placeholder {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-placeholder-a),
+    var(--color-placeholder-a) 10px,
+    var(--color-placeholder-b) 10px,
+    var(--color-placeholder-b) 20px
+  );
 }
