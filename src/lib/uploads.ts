@@ -1,9 +1,8 @@
 import "server-only";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import crypto from "node:crypto";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const UPLOADS_ROOT = path.join(process.cwd(), "public", "uploads");
+const BUCKET = "uploads";
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 const EXTENSION_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -15,10 +14,10 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 export class UploadError extends Error {}
 
 /**
- * Persists an uploaded photo to disk under /public/uploads/<subdir> and
- * returns the public URL path to store on the record (e.g.
- * "/uploads/checkins/<uuid>.jpg"). Files land in the Next.js `public`
- * folder, so they're served directly with no route handler needed.
+ * Persists an uploaded photo to the "uploads" bucket in Supabase Storage,
+ * under <subdir>/<uuid>.<ext>, and returns its public URL. Storage (not
+ * local disk) is required here because production runs on a serverless
+ * platform with a read-only filesystem.
  */
 export async function savePhotoUpload(file: File, subdir: string): Promise<string> {
   const extension = EXTENSION_BY_MIME[file.type];
@@ -29,12 +28,16 @@ export async function savePhotoUpload(file: File, subdir: string): Promise<strin
     throw new UploadError("A imagem deve ter no máximo 8MB.");
   }
 
-  const dir = path.join(UPLOADS_ROOT, subdir);
-  await mkdir(dir, { recursive: true });
-
-  const filename = `${crypto.randomUUID()}.${extension}`;
+  const path = `${subdir}/${crypto.randomUUID()}.${extension}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
 
-  return `/uploads/${subdir}/${filename}`;
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(path, buffer, { contentType: file.type });
+
+  if (error) {
+    throw new UploadError("Não foi possível salvar a imagem. Tente novamente.");
+  }
+
+  return supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
