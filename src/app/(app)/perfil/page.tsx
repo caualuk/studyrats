@@ -28,7 +28,13 @@ export default async function PerfilPage() {
 
   return (
     <div className="mx-auto max-w-[920px] px-6 pb-20 pt-14">
-      <ProfileHeader name={user.name} avatarUrl={user.avatarUrl} bio={user.bio} streakStatus={streakStatus} />
+      <ProfileHeader
+        name={user.name}
+        username={user.username}
+        avatarUrl={user.avatarUrl}
+        bio={user.bio}
+        streakStatus={streakStatus}
+      />
 
       <div className="mx-auto max-w-[560px]">
         <StatsGrid

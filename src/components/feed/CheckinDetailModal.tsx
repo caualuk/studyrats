@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -42,8 +43,13 @@ export function CheckinDetailModal({
           />
           <div className="px-6 py-5">
             <div className="mb-2.5 flex items-center gap-2">
-              <Avatar src={checkin.authorAvatarUrl} name={checkin.authorName} size="sm" />
-              <span className="text-xs text-white/60">{checkin.authorName}</span>
+              <Link
+                href={`/perfil/${checkin.authorUsername}`}
+                className="flex items-center gap-2 hover:opacity-80"
+              >
+                <Avatar src={checkin.authorAvatarUrl} name={checkin.authorName} size="sm" />
+                <span className="text-xs text-white/60">{checkin.authorName}</span>
+              </Link>
               <span className="ml-auto shrink-0 text-[10px] text-white/35">
                 {checkin.dateLabel}
               </span>

@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-const username = z
+export const usernameField = z
   .string()
   .trim()
   .min(3, { error: "Use pelo menos 3 caracteres." })
@@ -18,7 +18,7 @@ const password = z
 export const SignupSchema = z
   .object({
     name: z.string().trim().min(2, { error: "Informe seu nome completo." }),
-    username,
+    username: usernameField,
     email: z.email({ error: "Informe um e-mail válido." }).trim(),
     password,
     confirmPassword: z.string(),
@@ -91,7 +91,9 @@ export const CommentSchema = z.object({
 
 export type CommentInput = z.infer<typeof CommentSchema>;
 
-export const UpdateBioSchema = z.object({
+export const UpdateProfileSchema = z.object({
+  name: z.string().trim().min(2, { error: "Informe seu nome completo." }),
+  username: usernameField,
   bio: z
     .string()
     .trim()
@@ -100,7 +102,7 @@ export const UpdateBioSchema = z.object({
     .or(z.literal("")),
 });
 
-export type UpdateBioInput = z.infer<typeof UpdateBioSchema>;
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 
 /** Shared shape for useActionState-backed forms across the app. */
 export type FormState = {

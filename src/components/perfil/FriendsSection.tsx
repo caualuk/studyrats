@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,10 +21,12 @@ export function FriendsSection({ friends }: { friends: PublicUser[] }) {
       ) : (
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {friends.map((friend) => (
-            <Card key={friend.id} className="flex flex-col items-center gap-2 px-3 py-4 text-center">
-              <Avatar src={friend.avatarUrl} name={friend.name} size="lg" />
-              <span className="line-clamp-1 text-xs font-bold">{friend.name}</span>
-            </Card>
+            <Link key={friend.id} href={`/perfil/${friend.username}`}>
+              <Card className="flex flex-col items-center gap-2 px-3 py-4 text-center transition-colors hover:border-border-strong">
+                <Avatar src={friend.avatarUrl} name={friend.name} size="lg" />
+                <span className="line-clamp-1 text-xs font-bold">{friend.name}</span>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

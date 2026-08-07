@@ -11,6 +11,7 @@ export type FeedCheckin = {
   tag: string;
   authorId: string;
   authorName: string;
+  authorUsername: string;
   authorAvatarUrl: string | null;
   dateLabel: string;
   createdAt: Date;
@@ -23,7 +24,7 @@ export type FeedCheckin = {
 
 function feedCheckinInclude(currentUserId: string) {
   return {
-    user: { select: { name: true, avatarUrl: true } },
+    user: { select: { name: true, username: true, avatarUrl: true } },
     challenge: { select: { name: true } },
     _count: { select: { likes: true, comments: true } },
     // Only fetches *my* like row (if any) instead of every like, so we can
@@ -45,6 +46,7 @@ function toFeedCheckin(c: CheckinWithRelations, currentUserId: string): FeedChec
     tag: c.challenge?.name ?? "Check-in livre",
     authorId: c.userId,
     authorName: c.user.name,
+    authorUsername: c.user.username,
     authorAvatarUrl: c.user.avatarUrl,
     dateLabel: formatDatePtBR(c.createdAt),
     createdAt: c.createdAt,
@@ -82,19 +84,24 @@ export async function getUserStudyDays(userId: string): Promise<Date[]> {
 }
 
 /**
- * All of a user's own check-ins, full detail (photo, likes, comments
- * included) -- used on the profile page for the activity calendar and the
- * per-day check-in list. `userId` doubles as the "liked by" viewer since
- * the profile page only ever shows the signed-in user's own profile.
+ * A user's check-ins, full detail (photo, likes, comments included) --
+ * used on the profile page (own or a friend's) for the activity calendar
+ * and the per-day check-in list. `viewerId` is separate from `userId`
+ * (whose check-ins) so `isOwner`/`likedByMe` reflect the actual viewer on
+ * someone else's profile, not the profile owner -- defaults to `userId`
+ * for the common case of viewing your own profile.
  */
-export async function getUserCheckins(userId: string): Promise<FeedCheckin[]> {
+export async function getUserCheckins(
+  userId: string,
+  viewerId: string = userId
+): Promise<FeedCheckin[]> {
   const checkins = await prisma.checkin.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    include: feedCheckinInclude(userId),
+    include: feedCheckinInclude(viewerId),
   });
 
-  return checkins.map((c) => toFeedCheckin(c, userId));
+  return checkins.map((c) => toFeedCheckin(c, viewerId));
 }
 
 /**

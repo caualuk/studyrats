@@ -1,10 +1,11 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
-import { UpdateBioSchema, type FormState } from "@/lib/validations";
+import { UpdateProfileSchema, type FormState } from "@/lib/validations";
 
 export async function updateAvatar(_prevState: FormState, formData: FormData): Promise<FormState> {
   const session = await verifySession();
@@ -37,23 +38,36 @@ export async function updateAvatar(_prevState: FormState, formData: FormData): P
   return { success: true };
 }
 
-export async function updateBio(_prevState: FormState, formData: FormData): Promise<FormState> {
+export async function updateProfile(_prevState: FormState, formData: FormData): Promise<FormState> {
   const session = await verifySession();
 
-  const validated = UpdateBioSchema.safeParse({ bio: formData.get("bio") });
+  const validated = UpdateProfileSchema.safeParse({
+    name: formData.get("name"),
+    username: formData.get("username"),
+    bio: formData.get("bio"),
+  });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
 
+  const { name, username, bio } = validated.data;
+
   try {
     await prisma.user.update({
       where: { id: session.userId },
-      data: { bio: validated.data.bio || null },
+      data: { name, username: username.toLowerCase(), bio: bio || null },
     });
-  } catch {
-    return { message: "Não foi possível salvar a bio." };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { errors: { username: ["Esse nome de usuário já está em uso."] } };
+    }
+    return { message: "Não foi possível salvar o perfil." };
   }
 
   revalidatePath("/perfil");
+  revalidatePath(`/perfil/${username.toLowerCase()}`);
+  revalidatePath("/feed");
+  revalidatePath("/ranking");
+  revalidatePath("/desafios");
   return { success: true };
 }
