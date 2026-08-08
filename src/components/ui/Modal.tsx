@@ -40,6 +40,12 @@ export function Modal({
         event.stopPropagation();
         onClose();
       }}
+      // Same portal-bubbling issue as the click handler above, but for
+      // keydown -- e.g. pressing Enter in a text field inside this modal
+      // would otherwise bubble to an ancestor card's own onKeyDown (like the
+      // check-in photo's "Enter opens detail view" handler) and pop open an
+      // unrelated modal on top of this one.
+      onKeyDown={(event) => event.stopPropagation()}
       role="presentation"
     >
       <div
