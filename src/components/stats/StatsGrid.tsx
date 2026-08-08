@@ -14,7 +14,7 @@ export function StatsGrid({
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-4 gap-3.5", className)}>
+    <div className={cn("grid grid-cols-2 gap-3.5 sm:grid-cols-4", className)}>
       {stats.map((stat) => (
         <Card
           key={stat.label}

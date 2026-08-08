@@ -126,7 +126,7 @@ function EditChallengeForm({
       <input type="hidden" name="coverColor" value={selectedColor ?? ""} />
 
       {!previewUrl && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="mr-0.5 text-[10px] text-white/35">Ou uma cor:</span>
           {CHALLENGE_COVER_COLORS.map((color) => (
             <button

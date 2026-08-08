@@ -88,7 +88,7 @@ export function CreateChallengeForm() {
         <input type="hidden" name="coverColor" value={coverColor ?? ""} />
 
         {!previewUrl && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="mr-0.5 text-[10px] text-white/35">Ou uma cor:</span>
             {CHALLENGE_COVER_COLORS.map((color) => (
               <button
@@ -132,7 +132,7 @@ export function CreateChallengeForm() {
 
         <div>
           <Label>Vale nos dias</Label>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {WEEKDAY_LABELS_PT.map((label, day) => (
               <button
                 key={day}

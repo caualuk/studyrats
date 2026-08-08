@@ -42,7 +42,7 @@ export default async function PublicProfilePage({
   const streakStatus = getStreakStatus(studyDays);
 
   return (
-    <div className="mx-auto max-w-[920px] px-6 pb-20 pt-14">
+    <div className="mx-auto max-w-[920px] px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
       <Link href="/perfil" className="mb-6 inline-block text-xs text-white/45 hover:text-white/70">
         ← Perfil
       </Link>
@@ -51,7 +51,7 @@ export default async function PublicProfilePage({
         <div className="mb-5 flex justify-center">
           <Avatar src={profile.avatarUrl} name={profile.name} size="xl" />
         </div>
-        <h1 className="mb-0.5 text-[32px] font-extrabold">{profile.name}</h1>
+        <h1 className="mb-0.5 text-[26px] font-extrabold sm:text-[32px]">{profile.name}</h1>
         <p className="mb-2 text-[13px] text-white/40">@{profile.username}</p>
         <StreakLine status={streakStatus} subject={profile.name.split(" ")[0]} />
         {profile.bio && (

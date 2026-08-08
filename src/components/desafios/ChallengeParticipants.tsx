@@ -19,11 +19,11 @@ export function ChallengeParticipants({
       {members.map((member) => (
         <div
           key={member.userId}
-          className="flex items-center gap-3.5 border-b border-border px-[18px] py-3.5 last:border-b-0"
+          className="flex items-center gap-2.5 border-b border-border px-3 py-3.5 last:border-b-0 sm:gap-3.5 sm:px-[18px]"
         >
           <Avatar src={member.avatarUrl} name={member.name} size="lg" />
-          <div className="flex-1">
-            <div className="text-sm">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm">
               {member.name}
               {member.isOwner && <span className="ml-1.5 text-[10px] text-accent">dono</span>}
               {!member.isOwner && member.isAdmin && (

@@ -10,8 +10,12 @@ import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import type { FeedCheckin } from "@/lib/checkins/queries";
 
+// Hover-to-reveal only works with a mouse -- on a touchscreen there's no
+// hover state to trigger it, which would make these icons permanently
+// unreachable. They stay always-visible below `sm` and only hide-until-hover
+// from `sm` up, where a pointer is available.
 const ICON_BUTTON_CLASSES =
-  "flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/85 opacity-0 outline-none transition-opacity hover:bg-black/75 focus-visible:opacity-100 group-hover:opacity-100";
+  "flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/85 opacity-100 outline-none transition-opacity hover:bg-black/75 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100";
 
 /**
  * Trash (top) and pencil (below it) icons overlaid on the check-in photo,
@@ -76,7 +80,7 @@ export function CheckinCardActions({ checkin }: { checkin: FeedCheckin }) {
 
       {checkin.canDelete && (
         <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-          <Card className="px-6 py-6 text-left">
+          <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
             <h2 className="mb-2 text-lg font-bold">Excluir check-in?</h2>
             <p className="mb-1 text-sm text-white/60">
               Essa ação não pode ser desfeita. A foto e os comentários somem junto.

@@ -17,11 +17,11 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
         color={challenge.coverColor}
         alt={challenge.name}
         label="capa do desafio"
-        className="mb-5 h-[160px] w-full rounded-2xl"
+        className="mb-5 h-[120px] w-full rounded-2xl sm:h-[160px]"
       />
 
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="text-[32px] font-extrabold">{challenge.name}</h1>
+        <h1 className="text-[26px] font-extrabold sm:text-[32px]">{challenge.name}</h1>
         <div className="flex items-center gap-2">
           {challenge.canManage && (
             <EditChallengeDialog

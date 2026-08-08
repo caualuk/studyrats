@@ -31,7 +31,7 @@ export function EditProfileDialog({
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)}>
-        <Card className="px-6 py-6 text-left">
+        <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
           <h2 className="mb-4 text-lg font-bold">Editar perfil</h2>
           <EditProfileForm name={name} username={username} bio={bio} onSaved={() => setOpen(false)} />
         </Card>

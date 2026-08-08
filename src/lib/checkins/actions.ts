@@ -48,11 +48,11 @@ export async function startCheckin(): Promise<{ message?: string }> {
 
 /**
  * Cancels an in-progress check-in without checking out (e.g. started by
- * mistake). Never touches study_days -- only a completed check-out earns a
- * study day, so there's nothing to undo there. An in-progress check-in was
- * never linked to any challenge yet either (that's chosen at check-out), so
- * there's nothing to revalidate beyond the feed. Only ever triggered from
- * the cronometer page now, so sends the user back to the feed on success.
+ * mistake) -- discards it entirely, unlike stopCheckin below. Never touches
+ * study_days -- only a completed check-out earns a study day, so there's
+ * nothing to undo there. An in-progress check-in was never linked to any
+ * challenge yet either (that's chosen at check-out), so there's nothing to
+ * revalidate beyond the feed.
  */
 export async function cancelCheckin(checkinId: string): Promise<{ message?: string }> {
   const session = await verifySession();
@@ -71,6 +71,33 @@ export async function cancelCheckin(checkinId: string): Promise<{ message?: stri
     return { message: "Não foi possível cancelar esse check-in." };
   }
 
+  revalidatePath("/feed");
+  redirect("/feed");
+}
+
+/**
+ * "Parar" on the cronometer page: pauses the session (if not already) and
+ * sends the user back to the feed -- the check-in stays alive, so clicking
+ * "Iniciar check-in" again (or the navbar timer) returns to this exact same
+ * session, still paused at the same elapsed time, instead of losing
+ * progress. Distinct from cancelCheckin, which discards the session outright.
+ */
+export async function stopCheckin(checkinId: string): Promise<{ message?: string }> {
+  const session = await verifySession();
+
+  const checkin = await prisma.checkin.findUnique({
+    where: { id: checkinId },
+    select: { userId: true, checkedOutAt: true, pausedAt: true },
+  });
+  if (!checkin || checkin.userId !== session.userId || checkin.checkedOutAt) {
+    return { message: "Não foi possível parar esse check-in." };
+  }
+
+  if (!checkin.pausedAt) {
+    await prisma.checkin.update({ where: { id: checkinId }, data: { pausedAt: new Date() } });
+  }
+
+  revalidatePath("/cronometro");
   revalidatePath("/feed");
   redirect("/feed");
 }

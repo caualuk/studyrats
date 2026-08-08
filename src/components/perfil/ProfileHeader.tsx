@@ -19,7 +19,7 @@ export function ProfileHeader({
   return (
     <div className="mb-9 text-center">
       <AvatarUploader avatarUrl={avatarUrl} name={name} />
-      <h1 className="mb-0.5 text-[32px] font-extrabold">{name}</h1>
+      <h1 className="mb-0.5 text-[26px] font-extrabold sm:text-[32px]">{name}</h1>
       <p className="mb-2 text-[13px] text-white/40">@{username}</p>
       <StreakLine status={streakStatus} />
       {bio && (

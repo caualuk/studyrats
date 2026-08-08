@@ -7,14 +7,14 @@ import type { ActiveCheckin } from "@/lib/checkins/queries";
 
 export function Navbar({ activeCheckin }: { activeCheckin: ActiveCheckin | null }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/90 px-8 py-3.5 backdrop-blur-sm">
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/90 px-4 py-3.5 backdrop-blur-sm sm:px-6 md:px-8">
       <Link href="/feed">
         <LogoMark />
       </Link>
 
       <NavTabs />
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-3 sm:gap-5">
         <NavCronometer activeCheckin={activeCheckin} />
         <form action={logout}>
           <button

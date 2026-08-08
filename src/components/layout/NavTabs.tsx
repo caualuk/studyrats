@@ -4,18 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
-const TABS = [
+export const TABS = [
   { href: "/feed", label: "Feed" },
   { href: "/ranking", label: "Ranking" },
   { href: "/desafios", label: "Desafios" },
   { href: "/perfil", label: "Perfil" },
 ] as const;
 
+/** Desktop/tablet nav row -- hidden below `md`, where BottomTabBar takes over instead. */
 export function NavTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-7">
+    <nav className="hidden items-center gap-7 md:flex">
       {TABS.map((tab) => {
         const isActive = pathname.startsWith(tab.href);
         return (

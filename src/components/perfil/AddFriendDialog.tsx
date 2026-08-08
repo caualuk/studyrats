@@ -38,7 +38,7 @@ export function AddFriendDialog() {
       </Button>
 
       <Modal open={open} onClose={() => setOpen(false)}>
-        <Card className="px-6 py-6 text-left">
+        <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
           <h2 className="mb-1 text-lg font-bold">Adicionar amigos</h2>
           <p className="mb-4 text-xs text-white/45">
             Envie esse link para alguém. Quando a pessoa abrir e estiver logada, vocês

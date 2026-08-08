@@ -13,7 +13,7 @@ export function CommentButton({ checkin }: { checkin: FeedCheckin }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[13px] text-white/45 transition-colors hover:text-white/70"
+        className="-my-2.5 py-2.5 text-[13px] text-white/45 transition-colors hover:text-white/70"
       >
         💬 Comentar{checkin.commentsCount > 0 && ` · ${checkin.commentsCount}`}
       </button>

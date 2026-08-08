@@ -23,7 +23,7 @@ export default async function PerfilPage() {
   const streakStatus = getStreakStatus(studyDays);
 
   return (
-    <div className="mx-auto max-w-[920px] px-6 pb-20 pt-14">
+    <div className="mx-auto max-w-[920px] px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
       <ProfileHeader
         name={user.name}
         username={user.username}

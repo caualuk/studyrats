@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cancelCheckin, pauseCheckin, resumeCheckin, startCheckin } from "@/lib/checkins/actions";
+import {
+  cancelCheckin,
+  pauseCheckin,
+  resumeCheckin,
+  startCheckin,
+  stopCheckin,
+} from "@/lib/checkins/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CheckOutDialog } from "@/components/checkins/CheckOutDialog";
@@ -58,8 +64,8 @@ export function CronometerView({
 
   if (!activeCheckin) {
     return (
-      <Card className="px-6 py-10">
-        <p className="mb-6 font-mono text-5xl font-extrabold text-white/25">00:00</p>
+      <Card className="px-4 py-8 sm:px-6 sm:py-10">
+        <p className="mb-6 font-mono text-4xl font-extrabold text-white/25 sm:text-5xl">00:00</p>
         {message && (
           <p className="mb-3 text-xs text-red-400" role="alert">
             {message}
@@ -81,11 +87,11 @@ export function CronometerView({
   }
 
   return (
-    <Card className="px-6 py-10">
+    <Card className="px-4 py-8 sm:px-6 sm:py-10">
       <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-white/40">
         {paused ? "Pausado" : "Estudando"}
       </p>
-      <p className="mb-8 font-mono text-6xl font-extrabold text-accent">
+      <p className="mb-8 font-mono text-5xl font-extrabold text-accent sm:text-6xl">
         {formatStopwatch(elapsedMs(activeCheckin, now))}
       </p>
 
@@ -104,10 +110,9 @@ export function CronometerView({
         <Button
           variant="ghost"
           disabled={isPending}
-          className="border-red-500/40 text-red-400 hover:bg-red-500/10"
           onClick={() =>
             startTransition(async () => {
-              await cancelCheckin(activeCheckin.id);
+              await stopCheckin(activeCheckin.id);
             })
           }
         >
@@ -117,6 +122,19 @@ export function CronometerView({
           Checkout
         </Button>
       </div>
+
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() =>
+          startTransition(async () => {
+            await cancelCheckin(activeCheckin.id);
+          })
+        }
+        className="mt-5 text-[11px] text-white/35 transition-colors hover:text-red-400 disabled:opacity-50"
+      >
+        Cancelar check-in (descarta essa sessão)
+      </button>
 
       <CheckOutDialog
         checkin={activeCheckin}

@@ -14,8 +14,8 @@ export default async function CronometroPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-[560px] px-6 pb-20 pt-14 text-center">
-      <h1 className="mb-8 text-[32px] font-extrabold">Cronômetro.</h1>
+    <div className="mx-auto max-w-[560px] px-4 pb-20 pt-10 text-center sm:px-6 sm:pt-14">
+      <h1 className="mb-8 text-[28px] font-extrabold sm:text-[32px]">Cronômetro.</h1>
       <CronometerView activeCheckin={activeCheckin} challenges={challenges} />
     </div>
   );

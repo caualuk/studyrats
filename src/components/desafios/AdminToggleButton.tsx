@@ -30,7 +30,7 @@ export function AdminToggleButton({
       onClick={handleClick}
       disabled={isPending}
       className={cn(
-        "shrink-0 text-[10px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "-m-2 shrink-0 p-2 text-[10px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         admin ? "text-accent" : "text-white/40 hover:text-white/70"
       )}
     >

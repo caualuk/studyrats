@@ -6,8 +6,14 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 
-const FRAME_W = 320;
-const FRAME_H = 180; // 16:9 -- close to how check-in photos actually render (feed cards, detail modal)
+// 16:9 -- close to how check-in photos actually render (feed cards, detail
+// modal). The frame itself is CSS-sized (w-full, capped at MAX_FRAME_W, with
+// aspect-video enforcing the ratio) so it never overflows a narrow phone's
+// dialog width -- frameSize below tracks its *actual* rendered pixels via
+// ResizeObserver, since the drag/zoom/crop math all needs real numbers, not
+// the CSS intent.
+const MAX_FRAME_W = 320;
+const ASPECT = 16 / 9;
 const OUTPUT_W = 1280;
 const OUTPUT_H = 720;
 
@@ -35,12 +41,25 @@ export function ImageCropper({
   onConfirm: (blob: Blob) => void;
 }) {
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(
     null
   );
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [frameSize, setFrameSize] = useState({ w: MAX_FRAME_W, h: MAX_FRAME_W / ASPECT });
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setFrameSize({ w: width, h: width / ASPECT });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Creating and revoking the object URL both live in this one effect (not
   // e.g. a useMemo for creation + a separate effect for cleanup) so they
@@ -54,7 +73,9 @@ export function ImageCropper({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const baseScale = naturalSize ? Math.max(FRAME_W / naturalSize.w, FRAME_H / naturalSize.h) : 1;
+  const baseScale = naturalSize
+    ? Math.max(frameSize.w / naturalSize.w, frameSize.h / naturalSize.h)
+    : 1;
   const scale = baseScale * zoom;
   const dispW = naturalSize ? naturalSize.w * scale : 0;
   const dispH = naturalSize ? naturalSize.h * scale : 0;
@@ -62,8 +83,8 @@ export function ImageCropper({
   function clampOffset(x: number, y: number, atScale: number) {
     const w = naturalSize ? naturalSize.w * atScale : 0;
     const h = naturalSize ? naturalSize.h * atScale : 0;
-    const minX = Math.min(0, FRAME_W - w);
-    const minY = Math.min(0, FRAME_H - h);
+    const minX = Math.min(0, frameSize.w - w);
+    const minY = Math.min(0, frameSize.h - h);
     return { x: Math.min(0, Math.max(minX, x)), y: Math.min(0, Math.max(minY, y)) };
   }
 
@@ -111,8 +132,8 @@ export function ImageCropper({
 
     const cropX = -offset.x / scale;
     const cropY = -offset.y / scale;
-    const cropW = FRAME_W / scale;
-    const cropH = FRAME_H / scale;
+    const cropW = frameSize.w / scale;
+    const cropH = frameSize.h / scale;
     ctx.drawImage(imgRef.current, cropX, cropY, cropW, cropH, 0, 0, OUTPUT_W, OUTPUT_H);
     canvas.toBlob((blob) => blob && onConfirm(blob), "image/jpeg", 0.9);
   }
@@ -124,8 +145,8 @@ export function ImageCropper({
         <p className="mb-4 text-xs text-white/45">Arraste para posicionar. Use o zoom para aproximar.</p>
 
         <div
-          className="relative mx-auto touch-none select-none overflow-hidden rounded-xl border border-border-strong"
-          style={{ width: FRAME_W, height: FRAME_H }}
+          ref={frameRef}
+          className="relative mx-auto aspect-video w-full max-w-[320px] touch-none select-none overflow-hidden rounded-xl border border-border-strong"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

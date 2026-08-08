@@ -71,11 +71,11 @@ export default async function RankingPage({
   const rows = await getRanking(activePeriod.value, activeMetric.value, user.id);
 
   return (
-    <div className="mx-auto max-w-[820px] px-6 pb-20 pt-14 text-center">
-      <h1 className="mb-2 text-[42px] font-extrabold">Ranking.</h1>
+    <div className="mx-auto max-w-[820px] px-4 pb-20 pt-10 text-center sm:px-6 sm:pt-14">
+      <h1 className="mb-2 text-[32px] font-extrabold sm:text-[42px]">Ranking.</h1>
       <p className="mb-6 text-sm text-white/50">{activePeriod.subtitle}</p>
 
-      <div className="mb-3 inline-flex gap-1 rounded-full border border-border-strong p-1">
+      <div className="mb-3 inline-flex flex-wrap justify-center gap-1 rounded-full border border-border-strong p-1">
         {PERIODS.map((p) => (
           <Link
             key={p.value}
@@ -92,7 +92,7 @@ export default async function RankingPage({
         ))}
       </div>
       <div className="mb-8 flex justify-center">
-        <div className="inline-flex gap-1 rounded-full border border-border-strong p-1">
+        <div className="flex flex-wrap justify-center gap-1 rounded-full border border-border-strong p-1">
           {METRICS.map((m) => (
             <Link
               key={m.value}

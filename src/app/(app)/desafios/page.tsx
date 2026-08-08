@@ -13,9 +13,9 @@ export default async function DesafiosPage() {
   const challenges = await getMyChallenges(user.id);
 
   return (
-    <div className="mx-auto max-w-[920px] px-6 pb-20 pt-14 text-center">
+    <div className="mx-auto max-w-[920px] px-4 pb-20 pt-10 text-center sm:px-6 sm:pt-14">
       <div className="mb-1.5 text-xs uppercase tracking-wide text-white/40">Privado</div>
-      <h1 className="mb-2 text-[42px] font-extrabold">Desafios.</h1>
+      <h1 className="mb-2 text-[32px] font-extrabold sm:text-[42px]">Desafios.</h1>
       <p className="mx-auto mb-9 max-w-[560px] text-[13px] text-white/50">
         Um desafio é um grupo com prazo, capa e bate-papo próprio. Não aparece em nenhuma
         listagem pública: só entra quem receber o link ou o código.

@@ -99,7 +99,7 @@ export default async function ChallengeDetailPage({
   });
 
   return (
-    <div className="mx-auto max-w-[820px] px-6 pb-20 pt-14">
+    <div className="mx-auto max-w-[820px] px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
       <ChallengeDetailHeader challenge={challenge} />
 
       <h2 className="mb-4 mt-10 text-xl font-bold">Participantes.</h2>
@@ -114,7 +114,7 @@ export default async function ChallengeDetailPage({
       <ChallengeTrack runners={runners} />
 
       <h2 className="mb-4 mt-10 text-xl font-bold">Ranking.</h2>
-      <div className="mb-4 inline-flex gap-1 rounded-full border border-border-strong p-1">
+      <div className="mb-4 inline-flex flex-wrap gap-1 rounded-full border border-border-strong p-1">
         {METRICS.map((m) => (
           <Link
             key={m.value}
