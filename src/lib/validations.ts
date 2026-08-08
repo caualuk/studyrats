@@ -71,6 +71,7 @@ export const ChallengeUpdateSchema = z.object({
   description: z.string().trim().max(300).optional().or(z.literal("")),
   startDate: z.string().trim().optional().or(z.literal("")),
   endDate: z.string().trim().optional().or(z.literal("")),
+  weekdays: z.array(z.string()).optional(),
   coverColor: z
     .string()
     .trim()

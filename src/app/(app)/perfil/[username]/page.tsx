@@ -20,7 +20,12 @@ export async function generateMetadata({
   return { title: `@${username}` };
 }
 
-/** Read-only view of another user's profile -- own username redirects to the editable /perfil instead. */
+/**
+ * Read-only view of another user's profile -- own username redirects to the
+ * editable /perfil instead. Only visible to friends of that user (see
+ * getProfileByUsername); anyone else gets the same 404 as a nonexistent
+ * username.
+ */
 export default async function PublicProfilePage({
   params,
 }: {
@@ -29,7 +34,7 @@ export default async function PublicProfilePage({
   const { username } = await params;
   const currentUser = await getCurrentUser();
 
-  const profile = await getProfileByUsername(username);
+  const profile = await getProfileByUsername(username, currentUser.id);
   if (!profile) notFound();
   if (profile.id === currentUser.id) redirect("/perfil");
 

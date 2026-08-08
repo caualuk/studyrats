@@ -32,6 +32,7 @@ export function ChallengeDetailHeader({ challenge }: { challenge: ChallengeDetai
               coverColor={challenge.coverColor}
               startDate={challenge.startDate}
               endDate={challenge.endDate}
+              weekdays={challenge.weekdays}
               isOwner={challenge.isOwner}
             />
           )}

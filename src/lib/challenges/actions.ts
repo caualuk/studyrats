@@ -113,12 +113,16 @@ export async function updateChallenge(_prevState: FormState, formData: FormData)
     description: formData.get("description"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
+    weekdays: formData.getAll("weekdays"),
     coverColor: formData.get("coverColor"),
   });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
-  const { name, description, startDate, endDate, coverColor } = validated.data;
+  const { name, description, startDate, endDate, weekdays, coverColor } = validated.data;
+  // Same fallback as createChallenge: an empty selection would make the
+  // challenge impossible to ever complete a day for.
+  const weekdayNumbers = weekdays && weekdays.length > 0 ? weekdays.map(Number) : [0, 1, 2, 3, 4, 5, 6];
 
   let coverUrl: string | undefined;
   const cover = formData.get("cover");
@@ -139,6 +143,7 @@ export async function updateChallenge(_prevState: FormState, formData: FormData)
         description: description || null,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : null,
+        weekdays: weekdayNumbers,
         coverColor: coverColor || null,
         ...(coverUrl && { coverUrl }),
       },

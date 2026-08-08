@@ -6,6 +6,13 @@ export type RankingRow = {
   position: number;
   userId: string;
   name: string;
+  // Optional: only set by getRanking below, whose audience is always the
+  // viewer + their friends, so linking to /perfil/[username] from it is
+  // always allowed. The challenge track/ranking reuses this type without a
+  // username -- see desafios/[id]/page.tsx -- since its members aren't
+  // necessarily friends of the viewer, and RankingList only links a row when
+  // username is present.
+  username?: string;
   avatarUrl: string | null;
   checkinsCount: number;
   studyMs: number;
@@ -72,7 +79,7 @@ export async function getRanking(
 
   const users = await prisma.user.findMany({
     where: { id: { in: ranked.map(([userId]) => userId) } },
-    select: { id: true, name: true, avatarUrl: true },
+    select: { id: true, name: true, username: true, avatarUrl: true },
   });
   const userById = new Map(users.map((u) => [u.id, u]));
 
@@ -82,6 +89,7 @@ export async function getRanking(
       position: index + 1,
       userId,
       name: user?.name ?? "Usuário removido",
+      username: user?.username,
       avatarUrl: user?.avatarUrl ?? null,
       checkinsCount: stats.count,
       studyMs: stats.ms,

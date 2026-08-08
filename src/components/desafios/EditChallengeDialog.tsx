@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { toDateKey } from "@/lib/dates";
+import { toDateKey, WEEKDAY_LABELS_PT } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 
 export function EditChallengeDialog({
@@ -18,6 +18,7 @@ export function EditChallengeDialog({
   coverColor,
   startDate,
   endDate,
+  weekdays,
   isOwner,
 }: {
   challengeId: string;
@@ -27,6 +28,7 @@ export function EditChallengeDialog({
   coverColor: string | null;
   startDate: Date;
   endDate: Date | null;
+  weekdays: number[];
   /** Only the owner can delete the challenge -- see deleteChallenge. */
   isOwner: boolean;
 }) {
@@ -48,6 +50,7 @@ export function EditChallengeDialog({
             coverColor={coverColor}
             startDate={startDate}
             endDate={endDate}
+            weekdays={weekdays}
             onSaved={() => setOpen(false)}
           />
           {isOwner && <DeleteChallengeSection challengeId={challengeId} />}
@@ -65,6 +68,7 @@ function EditChallengeForm({
   coverColor,
   startDate,
   endDate,
+  weekdays: initialWeekdays,
   onSaved,
 }: {
   challengeId: string;
@@ -74,11 +78,13 @@ function EditChallengeForm({
   coverColor: string | null;
   startDate: Date;
   endDate: Date | null;
+  weekdays: number[];
   onSaved: () => void;
 }) {
   const [state, formAction, pending] = useActionState(updateChallenge, undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(coverColor);
+  const [weekdays, setWeekdays] = useState<number[]>(initialWeekdays);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -182,6 +188,39 @@ function EditChallengeForm({
           defaultValue={endDate ? toDateKey(endDate) : ""}
           error={state?.errors?.endDate?.[0]}
         />
+      </div>
+
+      <div>
+        <Label>Vale nos dias</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {WEEKDAY_LABELS_PT.map((label, day) => (
+            <button
+              key={day}
+              type="button"
+              aria-pressed={weekdays.includes(day)}
+              aria-label={`Alternar ${label}`}
+              onClick={() =>
+                setWeekdays((current) =>
+                  current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort()
+                )
+              }
+              className={cn(
+                "h-7 w-7 shrink-0 rounded-full text-[11px] font-bold transition-colors",
+                weekdays.includes(day)
+                  ? "bg-accent text-accent-ink"
+                  : "bg-white/5 text-white/40 hover:bg-white/10"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {weekdays.map((day) => (
+          <input key={day} type="hidden" name="weekdays" value={day} />
+        ))}
+        {state?.errors?.weekdays?.[0] && (
+          <p className="mt-1.5 text-[11px] text-red-400">{state.errors.weekdays[0]}</p>
+        )}
       </div>
 
       {state?.message && (
