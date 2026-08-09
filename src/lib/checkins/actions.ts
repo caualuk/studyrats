@@ -265,10 +265,10 @@ export async function checkOutCheckin(
 const CheckinEditSchema = CheckoutSchema.pick({ title: true, description: true });
 
 /**
- * Edits a completed check-in's content (and optionally swaps its photo).
- * Deliberately never touches study_days or its challenge links -- editing a
- * post, even changing its title or photo entirely, must never affect the
- * streak or which challenges it counts for.
+ * Edits a completed check-in's content (title, description, optionally its
+ * photo) and which challenges it's linked to. Never touches study_days --
+ * the streak lives entirely there, so retagging or renaming a post can't
+ * retroactively earn or lose a day.
  */
 export async function editCheckin(
   checkinId: string,
@@ -293,6 +293,20 @@ export async function editCheckin(
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
 
+  // Same rule as check-out: only keep challenge ids the user actually
+  // belongs to, never trust whatever the request claims.
+  const requestedChallengeIds = formData
+    .getAll("challengeIds")
+    .filter((v): v is string => typeof v === "string" && v.length > 0);
+  let challengeIds: string[] = [];
+  if (requestedChallengeIds.length > 0) {
+    const memberships = await prisma.challengeMember.findMany({
+      where: { userId: session.userId, challengeId: { in: requestedChallengeIds } },
+      select: { challengeId: true },
+    });
+    challengeIds = memberships.map((m) => m.challengeId);
+  }
+
   let photoUrl: string | undefined;
   const photo = formData.get("photo");
   if (photo instanceof File && photo.size > 0) {
@@ -307,20 +321,29 @@ export async function editCheckin(
   const { title, description } = validated.data;
 
   try {
-    await prisma.checkin.update({
-      where: { id: checkinId },
-      data: {
-        title,
-        description: description || null,
-        ...(photoUrl && { photoUrl }),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.checkin.update({
+        where: { id: checkinId },
+        data: {
+          title,
+          description: description || null,
+          ...(photoUrl && { photoUrl }),
+        },
+      });
+      await tx.checkinChallenge.deleteMany({ where: { checkinId } });
+      if (challengeIds.length > 0) {
+        await tx.checkinChallenge.createMany({
+          data: challengeIds.map((challengeId) => ({ checkinId, challengeId })),
+        });
+      }
     });
   } catch {
     return { message: "Não foi possível salvar as alterações do check-in." };
   }
 
+  const previousChallengeIds = existing.challenges.map((c) => c.challengeId);
   for (const path of AFFECTED_PATHS) revalidatePath(path);
-  revalidateChallenges(existing.challenges.map((c) => c.challengeId));
+  revalidateChallenges([...new Set([...previousChallengeIds, ...challengeIds])]);
 
   return { success: true };
 }

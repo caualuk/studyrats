@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
-import { canManageChallenge } from "@/lib/challenges/queries";
+import { canManageChallenge, getMyChallengeOptions as queryMyChallengeOptions } from "@/lib/challenges/queries";
 import {
   ChallengeCreateSchema,
   ChallengeJoinSchema,
@@ -281,4 +281,15 @@ export async function joinChallenge(_prevState: FormState, formData: FormData): 
 
   revalidatePath("/desafios");
   return { success: true };
+}
+
+/**
+ * Server Action wrapper around the `getMyChallengeOptions` query, for
+ * client components (e.g. EditCheckinDialog) that need the viewer's
+ * challenge list on demand -- the query itself is `server-only` and can't
+ * be called directly from client code.
+ */
+export async function getMyChallengeOptions() {
+  const session = await verifySession();
+  return queryMyChallengeOptions(session.userId);
 }

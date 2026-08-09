@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TABS } from "@/components/layout/NavTabs";
+import { MOBILE_TABS } from "@/components/layout/NavTabs";
 import { cn } from "@/lib/cn";
 
 /**
@@ -20,7 +20,7 @@ export function BottomTabBar() {
       className="fixed inset-x-0 bottom-0 z-10 flex items-stretch justify-around border-t border-border bg-bg/95 backdrop-blur-sm md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {TABS.map((tab) => {
+      {MOBILE_TABS.map((tab) => {
         const isActive = pathname.startsWith(tab.href);
         const Icon = tab.icon;
         return (
