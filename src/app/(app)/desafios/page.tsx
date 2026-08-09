@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getMyChallenges } from "@/lib/challenges/queries";
-import { CreateChallengeForm } from "@/components/desafios/CreateChallengeForm";
-import { JoinChallengeForm } from "@/components/desafios/JoinChallengeForm";
+import { CreateChallengeDialog } from "@/components/desafios/CreateChallengeDialog";
+import { JoinChallengeDialog } from "@/components/desafios/JoinChallengeDialog";
 import { ChallengeCard } from "@/components/desafios/ChallengeCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -21,9 +21,9 @@ export default async function DesafiosPage() {
         listagem pública: só entra quem receber o link ou o código.
       </p>
 
-      <div className="mb-14 flex flex-wrap justify-center gap-[18px]">
-        <CreateChallengeForm />
-        <JoinChallengeForm />
+      <div className="mb-14 flex flex-wrap justify-center gap-3">
+        <CreateChallengeDialog />
+        <JoinChallengeDialog />
       </div>
 
       <h2 className="mb-5 text-[22px] font-bold">Meus desafios.</h2>

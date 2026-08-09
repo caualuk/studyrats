@@ -40,7 +40,7 @@ export function EditProfileDialog({
   );
 }
 
-function EditProfileForm({
+export function EditProfileForm({
   name,
   username,
   bio,

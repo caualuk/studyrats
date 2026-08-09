@@ -36,6 +36,7 @@ export type SessionUser = {
   email: string;
   avatarUrl: string | null;
   bio: string | null;
+  isPrivate: boolean;
   createdAt: Date;
 };
 
@@ -46,6 +47,7 @@ const SESSION_USER_SELECT = {
   email: true,
   avatarUrl: true,
   bio: true,
+  isPrivate: true,
   createdAt: true,
   passwordChangedAt: true,
 } as const;
@@ -82,6 +84,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser> => {
     email: user.email,
     avatarUrl: user.avatarUrl,
     bio: user.bio,
+    isPrivate: user.isPrivate,
     createdAt: user.createdAt,
   };
 });

@@ -24,11 +24,6 @@ export function formatMonthYearPtBR(year: number, month: number): string {
   return `${MONTH_NAMES_PT[month]} ${year}`;
 }
 
-/** Normalizes a Date to a stable "YYYY-M-D" key, ignoring time-of-day. */
-function toDayKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
 /**
  * A date's *local* calendar day as a zero-padded "YYYY-MM-DD" string --
  * used as the StudyDay.date storage key. Storing a plain string (rather
@@ -48,11 +43,6 @@ export function toDateKey(date: Date): string {
 export function fromDateKey(key: string): Date {
   const [year, month, day] = key.split("-").map(Number);
   return new Date(year, month - 1, day);
-}
-
-/** Number of distinct calendar days with at least one check-in. */
-export function countActiveDays(checkinDates: Date[]): number {
-  return new Set(checkinDates.map(toDayKey)).size;
 }
 
 function toDayIndex(date: Date): number {

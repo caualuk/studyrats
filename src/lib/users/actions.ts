@@ -71,3 +71,25 @@ export async function updateProfile(_prevState: FormState, formData: FormData): 
   revalidatePath("/desafios");
   return { success: true };
 }
+
+export async function updatePrivacy(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const session = await verifySession();
+  const isPrivate = formData.get("isPrivate") === "on";
+
+  let username: string;
+  try {
+    const user = await prisma.user.update({
+      where: { id: session.userId },
+      data: { isPrivate },
+      select: { username: true },
+    });
+    username = user.username;
+  } catch {
+    return { message: "Não foi possível salvar a privacidade do perfil." };
+  }
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/perfil");
+  revalidatePath(`/perfil/${username}`);
+  return { success: true };
+}

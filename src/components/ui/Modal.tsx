@@ -49,7 +49,7 @@ export function Modal({
       role="presentation"
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-bg shadow-2xl"
+        className="animate-modal-in w-full max-w-sm rounded-2xl bg-bg shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

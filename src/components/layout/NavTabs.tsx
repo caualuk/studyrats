@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FiAward, FiHome, FiTarget, FiUsers } from "react-icons/fi";
 import { cn } from "@/lib/cn";
 
+// `icon` is only rendered by BottomTabBar (the desktop row stays text-only)
+// -- kept on the same shared list rather than a separate map so the two
+// navs can't silently drift out of sync on which tabs exist.
 export const TABS = [
-  { href: "/feed", label: "Feed" },
-  { href: "/ranking", label: "Ranking" },
-  { href: "/desafios", label: "Desafios" },
-  { href: "/perfil", label: "Perfil" },
+  { href: "/feed", label: "Feed", icon: FiHome },
+  { href: "/ranking", label: "Ranking", icon: FiAward },
+  { href: "/desafios", label: "Desafios", icon: FiTarget },
+  { href: "/amigos", label: "Amigos", icon: FiUsers },
 ] as const;
 
 /** Desktop/tablet nav row -- hidden below `md`, where BottomTabBar takes over instead. */

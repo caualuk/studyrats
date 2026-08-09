@@ -29,6 +29,9 @@ export function ChallengeParticipants({
               {!member.isOwner && member.isAdmin && (
                 <span className="ml-1.5 text-[10px] text-accent">admin</span>
               )}
+              {member.isStudying && (
+                <span className="ml-1.5 text-[10px] font-semibold text-accent">estudando...</span>
+              )}
             </div>
             <div className="text-[10px] text-white/35">
               entrou em {formatDatePtBR(member.joinedAt)}

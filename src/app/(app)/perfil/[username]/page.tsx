@@ -3,9 +3,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getProfileByUsername } from "@/lib/users/queries";
-import { getStudyHoursThisMonth, getUserCheckins, getUserStudyDays } from "@/lib/checkins/queries";
-import { calculateLongestStreak, countActiveDays, getStreakStatus } from "@/lib/dates";
+import {
+  getStudyHoursThisMonth,
+  getUserCheckins,
+  getUserCheckinsCount,
+  getUserStudyDays,
+} from "@/lib/checkins/queries";
+import { getFriendsCount } from "@/lib/friends/queries";
+import { calculateLongestStreak, getStreakStatus } from "@/lib/dates";
 import { Avatar } from "@/components/ui/Avatar";
+import { Card } from "@/components/ui/Card";
 import { GrowingNumber } from "@/components/checkins/GrowingNumber";
 import { ProfileActivity } from "@/components/perfil/ProfileActivity";
 import { StreakLine } from "@/components/perfil/StreakLine";
@@ -22,9 +29,11 @@ export async function generateMetadata({
 
 /**
  * Read-only view of another user's profile -- own username redirects to the
- * editable /perfil instead. Only visible to friends of that user (see
- * getProfileByUsername); anyone else gets the same 404 as a nonexistent
- * username.
+ * editable /perfil instead. Every logged-in user can open any profile now
+ * (see getProfileByUsername); what changes is how much of it renders:
+ * friends and the owner always get the full page, everyone else gets the
+ * full page only if the owner hasn't gone private, and otherwise falls back
+ * to a stats-only view with no checkin photos or calendar.
  */
 export default async function PublicProfilePage({
   params,
@@ -38,11 +47,16 @@ export default async function PublicProfilePage({
   if (!profile) notFound();
   if (profile.id === currentUser.id) redirect("/perfil");
 
-  const [checkins, studyDays, hoursThisMonth] = await Promise.all([
-    getUserCheckins(profile.id, currentUser.id),
+  const [friendsCount, studyDays, hoursThisMonth] = await Promise.all([
+    getFriendsCount(profile.id),
     getUserStudyDays(profile.id),
     getStudyHoursThisMonth(profile.id),
   ]);
+
+  const checkins = profile.isFullAccess
+    ? await getUserCheckins(profile.id, currentUser.id)
+    : null;
+  const checkinsCount = checkins ? checkins.length : await getUserCheckinsCount(profile.id);
 
   const streakStatus = getStreakStatus(studyDays);
 
@@ -58,7 +72,9 @@ export default async function PublicProfilePage({
         </div>
         <h1 className="mb-0.5 text-[26px] font-extrabold sm:text-[32px]">{profile.name}</h1>
         <p className="mb-2 text-[13px] text-white/40">@{profile.username}</p>
-        <StreakLine status={streakStatus} subject={profile.name.split(" ")[0]} />
+        {profile.isFullAccess && (
+          <StreakLine status={streakStatus} subject={profile.name.split(" ")[0]} />
+        )}
         {profile.bio && (
           <p className="mx-auto mb-3 max-w-sm whitespace-pre-line text-[13px] leading-relaxed text-white/60">
             {profile.bio}
@@ -71,8 +87,8 @@ export default async function PublicProfilePage({
           className="mb-8"
           size="sm"
           stats={[
-            { value: checkins.length, label: "Check-ins" },
-            { value: countActiveDays(studyDays), label: "Dias ativos" },
+            { value: checkinsCount, label: "Check-ins" },
+            { value: friendsCount, label: "Amigos" },
             { value: calculateLongestStreak(studyDays), label: "Recorde seguido" },
             {
               value: <GrowingNumber value={hoursThisMonth} decimals={1} suffix="h" />,
@@ -82,7 +98,16 @@ export default async function PublicProfilePage({
         />
       </div>
 
-      <ProfileActivity checkins={checkins} />
+      {profile.isFullAccess ? (
+        <ProfileActivity checkins={checkins!} />
+      ) : (
+        <Card className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+          <p className="text-sm font-bold text-white">Esse perfil é privado.</p>
+          <p className="max-w-sm text-xs text-white/45">
+            Só amigos de {profile.name.split(" ")[0]} veem as fotos de check-in e o calendário.
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

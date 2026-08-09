@@ -22,16 +22,30 @@ export function BottomTabBar() {
     >
       {TABS.map((tab) => {
         const isActive = pathname.startsWith(tab.href);
+        const Icon = tab.icon;
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] transition-colors",
-              isActive ? "font-bold text-accent" : "font-normal text-white/50"
-            )}
+            className="flex flex-1 flex-col items-center justify-center gap-1 py-3.5"
           >
-            {tab.label}
+            <span
+              aria-hidden
+              className={cn(
+                "flex h-9 w-14 items-center justify-center rounded-full transition-colors",
+                isActive ? "bg-accent/15 text-accent" : "text-white/50"
+              )}
+            >
+              <Icon size={20} strokeWidth={isActive ? 2.25 : 2} />
+            </span>
+            <span
+              className={cn(
+                "text-[11px] transition-colors",
+                isActive ? "font-bold text-accent" : "font-normal text-white/50"
+              )}
+            >
+              {tab.label}
+            </span>
           </Link>
         );
       })}

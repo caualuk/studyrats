@@ -23,7 +23,7 @@ export function CheckoutSuccessModal({
           estudando.
         </p>
         <Button fullWidth onClick={onClose}>
-          Show de bola
+          Show de bola!
         </Button>
       </Card>
     </Modal>

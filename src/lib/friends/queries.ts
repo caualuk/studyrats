@@ -20,6 +20,10 @@ export type FriendWithStatus = PublicUser & {
   isStudying: boolean;
 };
 
+export async function getFriendsCount(userId: string): Promise<number> {
+  return prisma.friendship.count({ where: { userId } });
+}
+
 export async function getMyFriends(userId: string): Promise<FriendWithStatus[]> {
   const rows = await prisma.friendship.findMany({
     where: { userId },

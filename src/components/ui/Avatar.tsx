@@ -5,6 +5,7 @@ const SIZE_CLASSES = {
   sm: "h-[18px] w-[18px]",
   md: "h-8 w-8",
   lg: "h-9 w-9",
+  "2xl": "h-16 w-16",
   xl: "h-[88px] w-[88px]",
 } as const;
 
@@ -12,6 +13,7 @@ const INITIAL_TEXT_SIZE = {
   sm: "text-[9px]",
   md: "text-[13px]",
   lg: "text-sm",
+  "2xl": "text-xl",
   xl: "text-3xl",
 } as const;
 
@@ -30,7 +32,7 @@ export function Avatar({
   className?: string;
 }) {
   if (src) {
-    const pixelSize = { sm: 18, md: 32, lg: 36, xl: 88 }[size];
+    const pixelSize = { sm: 18, md: 32, lg: 36, "2xl": 64, xl: 88 }[size];
     return (
       <Image
         src={src}

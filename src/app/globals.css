@@ -53,6 +53,16 @@
   height: 0;
 }
 
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+.animate-modal-in {
+  animation: modal-in 150ms ease-out;
+}
+
 /* Repeating diagonal-stripe placeholder used for "photo not uploaded yet" UI. */
 .photo-placeholder {
   background-image: repeating-linear-gradient(

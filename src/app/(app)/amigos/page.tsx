@@ -1,15 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth/dal";
+import { getMyFriends } from "@/lib/friends/queries";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AddFriendDialog } from "@/components/perfil/AddFriendDialog";
-import type { FriendWithStatus } from "@/lib/friends/queries";
 
-export function FriendsSection({ friends }: { friends: FriendWithStatus[] }) {
+export const metadata: Metadata = { title: "Amigos" };
+
+export default async function AmigosPage() {
+  const user = await getCurrentUser();
+  const friends = await getMyFriends(user.id);
+
   return (
-    <div className="mt-8">
+    <div className="mx-auto max-w-[920px] px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
       <div className="mb-[18px] flex items-center justify-between">
-        <h2 className="text-xl font-bold">Amigos.</h2>
+        <h1 className="text-[32px] font-extrabold sm:text-[42px]">Amigos.</h1>
         <AddFriendDialog />
       </div>
 

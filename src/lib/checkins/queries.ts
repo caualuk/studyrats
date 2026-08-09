@@ -124,6 +124,15 @@ export async function getFeedCheckins(
 }
 
 /**
+ * Just the count, for contexts that show a stat tile but shouldn't fetch
+ * (and thus never even hold in memory) photo URLs or other detail -- e.g. a
+ * private profile's stats-only view for non-friends.
+ */
+export async function getUserCheckinsCount(userId: string): Promise<number> {
+  return prisma.checkin.count({ where: { userId, ...COMPLETED } });
+}
+
+/**
  * A user's study streak calendar, sourced from `study_days` -- not from
  * check-in timestamps. This is what makes the streak independent of
  * whether any given check-in post still exists (see deleteCheckin).
@@ -159,30 +168,6 @@ export async function getUserCheckins(
   ]);
 
   return checkins.map((c) => toFeedCheckin(c, viewerId, managedChallengeIds, myChallengeIds));
-}
-
-/**
- * Every check-in timestamp under a challenge, grouped by author -- used to
- * compute each member's current streak *within that challenge* for the
- * "pista" race (as opposed to `checkinsCount`, a plain total). This stays
- * check-in-based on purpose: a challenge's pista tracks consistency within
- * that specific challenge, not the user's overall study streak.
- */
-export async function getChallengeCheckinDatesByMember(
-  challengeId: string
-): Promise<Map<string, Date[]>> {
-  const rows = await prisma.checkin.findMany({
-    where: { ...COMPLETED, challenges: { some: { challengeId } } },
-    select: { userId: true, createdAt: true },
-  });
-
-  const byUser = new Map<string, Date[]>();
-  for (const row of rows) {
-    const dates = byUser.get(row.userId);
-    if (dates) dates.push(row.createdAt);
-    else byUser.set(row.userId, [row.createdAt]);
-  }
-  return byUser;
 }
 
 /**

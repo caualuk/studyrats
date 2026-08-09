@@ -206,11 +206,13 @@ export type ChallengeMemberRow = {
   isAdmin: boolean;
   checkinsCount: number;
   studyMs: number;
+  /** Whether this member currently has a check-in in progress (not yet checked out) -- not scoped to this challenge, since a checkin only links to challenges at checkout. */
+  isStudying: boolean;
 };
 
 /** Every member of a challenge, each with their check-in count and total study time within it. */
 export async function getChallengeMembers(challengeId: string): Promise<ChallengeMemberRow[]> {
-  const [members, challenge, checkins] = await Promise.all([
+  const [members, challenge, checkins, activeCheckins] = await Promise.all([
     prisma.challengeMember.findMany({
       where: { challengeId },
       orderBy: { joinedAt: "asc" },
@@ -226,6 +228,10 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
       where: { checkedOutAt: { not: null }, challenges: { some: { challengeId } } },
       select: { userId: true, createdAt: true, checkedOutAt: true, pausedMs: true },
     }),
+    prisma.checkin.findMany({
+      where: { checkedOutAt: null, user: { challengeMemberships: { some: { challengeId } } } },
+      select: { userId: true },
+    }),
   ]);
 
   const statsByUser = new Map<string, { count: number; ms: number }>();
@@ -235,6 +241,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
     stats.ms += c.checkedOutAt!.getTime() - c.createdAt.getTime() - c.pausedMs;
     statsByUser.set(c.userId, stats);
   }
+  const studyingIds = new Set(activeCheckins.map((c) => c.userId));
 
   return members.map((m) => {
     const stats = statsByUser.get(m.userId) ?? { count: 0, ms: 0 };
@@ -247,6 +254,7 @@ export async function getChallengeMembers(challengeId: string): Promise<Challeng
       isAdmin: m.isAdmin,
       checkinsCount: stats.count,
       studyMs: stats.ms,
+      isStudying: studyingIds.has(m.userId),
     };
   });
 }

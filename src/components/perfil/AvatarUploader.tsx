@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { updateAvatar } from "@/lib/users/actions";
 import { Avatar } from "@/components/ui/Avatar";
+import { ImageCropper } from "@/components/ui/ImageCropper";
+import { setInputFile } from "@/lib/fileInput";
 
 export function AvatarUploader({
   avatarUrl,
@@ -13,7 +15,9 @@ export function AvatarUploader({
 }) {
   const [state, formAction, pending] = useActionState(updateAvatar, undefined);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Once the upload succeeds, the parent Server Component re-fetches the
   // user and passes down the real `avatarUrl` -- drop the local blob
@@ -50,6 +54,7 @@ export function AvatarUploader({
           </span>
         </label>
         <input
+          ref={avatarInputRef}
           id="avatar"
           name="avatar"
           type="file"
@@ -57,12 +62,31 @@ export function AvatarUploader({
           className="sr-only"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (!file) return;
-            setPreviewUrl(URL.createObjectURL(file));
-            formRef.current?.requestSubmit();
+            if (file) setCropFile(file);
           }}
         />
       </form>
+
+      <ImageCropper
+        key={cropFile ? `${cropFile.name}-${cropFile.lastModified}-${cropFile.size}` : "empty"}
+        file={cropFile}
+        open={cropFile !== null}
+        outputWidth={512}
+        outputHeight={512}
+        shape="circle"
+        onCancel={() => {
+          setCropFile(null);
+          if (avatarInputRef.current) avatarInputRef.current.value = "";
+        }}
+        onConfirm={(blob) => {
+          const cropped = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+          if (avatarInputRef.current) setInputFile(avatarInputRef.current, cropped);
+          setPreviewUrl(URL.createObjectURL(cropped));
+          setCropFile(null);
+          formRef.current?.requestSubmit();
+        }}
+      />
+
       {state?.message && (
         <p className="text-[11px] text-red-400" role="alert">
           {state.message}

@@ -21,6 +21,10 @@ model User {
   passwordHash      String
   avatarUrl         String?
   bio               String?
+  // When true, only friends see checkin photos/calendar on this user's
+  // public profile -- everyone else (including logged-in non-friends) gets
+  // the stats-only view. See getProfileByUsername.
+  isPrivate         Boolean   @default(false)
   // Set whenever the password changes (including via reset). Sessions
   // issued before this timestamp are treated as invalid -- see
   // src/lib/auth/dal.ts -- so a stolen cookie stops working the moment the

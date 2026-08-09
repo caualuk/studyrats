@@ -5,25 +5,29 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { cn } from "@/lib/cn";
 
-// 16:9 -- close to how check-in photos actually render (feed cards, detail
-// modal). The frame itself is CSS-sized (w-full, capped at MAX_FRAME_W, with
-// aspect-video enforcing the ratio) so it never overflows a narrow phone's
-// dialog width -- frameSize below tracks its *actual* rendered pixels via
-// ResizeObserver, since the drag/zoom/crop math all needs real numbers, not
-// the CSS intent.
+// Default 16:9 -- close to how check-in photos actually render (feed cards,
+// detail modal). The frame itself is CSS-sized (w-full, capped at
+// MAX_FRAME_W, with aspectRatio enforcing the ratio) so it never overflows a
+// narrow phone's dialog width -- frameSize below tracks its *actual*
+// rendered pixels via ResizeObserver, since the drag/zoom/crop math all
+// needs real numbers, not the CSS intent.
 const MAX_FRAME_W = 320;
-const ASPECT = 16 / 9;
-const OUTPUT_W = 1280;
-const OUTPUT_H = 720;
 
 /**
  * Lets the user drag-to-position and zoom a just-picked photo inside a
- * fixed 16:9 frame before it uploads, instead of leaving the crop entirely
+ * fixed-aspect frame before it uploads, instead of leaving the crop entirely
  * to CSS `object-cover` at render time. Renders the result to a canvas at a
  * fixed resolution and hands back a JPEG blob -- always JPEG regardless of
  * the source type, since canvas export doesn't reliably support GIF/WEBP
  * and a static crop already drops GIF animation anyway.
+ *
+ * `outputWidth`/`outputHeight` set both the frame's aspect ratio and the
+ * exported canvas resolution -- pass a 1:1 pair with `shape="circle"` for
+ * avatar-style crops (round frame, still exports a square image; the circle
+ * is just a preview mask so `object-cover` on a round `<Avatar>` matches
+ * what the user actually centered).
  *
  * The caller should remount this component (e.g. `key={file?.name}`) when
  * a new file is picked so zoom/pan/naturalSize reset to their defaults --
@@ -34,12 +38,19 @@ export function ImageCropper({
   open,
   onCancel,
   onConfirm,
+  outputWidth = 1280,
+  outputHeight = 720,
+  shape = "rect",
 }: {
   file: File | null;
   open: boolean;
   onCancel: () => void;
   onConfirm: (blob: Blob) => void;
+  outputWidth?: number;
+  outputHeight?: number;
+  shape?: "rect" | "circle";
 }) {
+  const aspect = outputWidth / outputHeight;
   const imgRef = useRef<HTMLImageElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(
@@ -48,18 +59,18 @@ export function ImageCropper({
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [frameSize, setFrameSize] = useState({ w: MAX_FRAME_W, h: MAX_FRAME_W / ASPECT });
+  const [frameSize, setFrameSize] = useState({ w: MAX_FRAME_W, h: MAX_FRAME_W / aspect });
 
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
-      if (width) setFrameSize({ w: width, h: width / ASPECT });
+      if (width) setFrameSize({ w: width, h: width / aspect });
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [aspect]);
 
   // Creating and revoking the object URL both live in this one effect (not
   // e.g. a useMemo for creation + a separate effect for cleanup) so they
@@ -125,8 +136,8 @@ export function ImageCropper({
   function handleConfirm() {
     if (!imgRef.current || !naturalSize) return;
     const canvas = document.createElement("canvas");
-    canvas.width = OUTPUT_W;
-    canvas.height = OUTPUT_H;
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -134,7 +145,7 @@ export function ImageCropper({
     const cropY = -offset.y / scale;
     const cropW = frameSize.w / scale;
     const cropH = frameSize.h / scale;
-    ctx.drawImage(imgRef.current, cropX, cropY, cropW, cropH, 0, 0, OUTPUT_W, OUTPUT_H);
+    ctx.drawImage(imgRef.current, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
     canvas.toBlob((blob) => blob && onConfirm(blob), "image/jpeg", 0.9);
   }
 
@@ -146,7 +157,11 @@ export function ImageCropper({
 
         <div
           ref={frameRef}
-          className="relative mx-auto aspect-video w-full max-w-[320px] touch-none select-none overflow-hidden rounded-xl border border-border-strong"
+          className={cn(
+            "relative mx-auto w-full max-w-[320px] touch-none select-none overflow-hidden border border-border-strong",
+            shape === "circle" ? "rounded-full" : "rounded-xl"
+          )}
+          style={{ aspectRatio: aspect }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

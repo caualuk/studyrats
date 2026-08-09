@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getRanking, type RankingMetric, type RankingPeriod } from "@/lib/ranking/queries";
 import { RankingList } from "@/components/ranking/RankingList";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { cn } from "@/lib/cn";
+import { PillTabs } from "@/components/ui/PillTabs";
 
 export const metadata: Metadata = { title: "Ranking" };
 
@@ -39,12 +38,12 @@ const PERIODS: {
 ];
 
 const METRICS: { value: RankingMetric; label: string }[] = [
-  { value: "checkins", label: "Check-ins" },
   { value: "hours", label: "Horas" },
+  { value: "checkins", label: "Check-ins" },
 ];
 
 const DEFAULT_PERIOD: RankingPeriod = "week";
-const DEFAULT_METRIC: RankingMetric = "checkins";
+const DEFAULT_METRIC: RankingMetric = "hours";
 
 function buildHref(period: RankingPeriod, metric: RankingMetric): string {
   const params = new URLSearchParams();
@@ -75,39 +74,24 @@ export default async function RankingPage({
       <h1 className="mb-2 text-[32px] font-extrabold sm:text-[42px]">Ranking.</h1>
       <p className="mb-6 text-sm text-white/50">{activePeriod.subtitle}</p>
 
-      <div className="mb-3 inline-flex flex-wrap justify-center gap-1 rounded-full border border-border-strong p-1">
-        {PERIODS.map((p) => (
-          <Link
-            key={p.value}
-            href={buildHref(p.value, activeMetric.value)}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors",
-              p.value === activePeriod.value
-                ? "bg-accent text-accent-ink"
-                : "text-white/50 hover:text-white/80"
-            )}
-          >
-            {p.label}
-          </Link>
-        ))}
-      </div>
+      <PillTabs
+        className="mb-3"
+        active={activePeriod.value}
+        options={PERIODS.map((p) => ({
+          value: p.value,
+          label: p.label,
+          href: buildHref(p.value, activeMetric.value),
+        }))}
+      />
       <div className="mb-8 flex justify-center">
-        <div className="flex flex-wrap justify-center gap-1 rounded-full border border-border-strong p-1">
-          {METRICS.map((m) => (
-            <Link
-              key={m.value}
-              href={buildHref(activePeriod.value, m.value)}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-[13px] font-bold transition-colors",
-                m.value === activeMetric.value
-                  ? "bg-accent text-accent-ink"
-                  : "text-white/50 hover:text-white/80"
-              )}
-            >
-              {m.label}
-            </Link>
-          ))}
-        </div>
+        <PillTabs
+          active={activeMetric.value}
+          options={METRICS.map((m) => ({
+            value: m.value,
+            label: m.label,
+            href: buildHref(activePeriod.value, m.value),
+          }))}
+        />
       </div>
 
       {rows.length === 0 ? (
