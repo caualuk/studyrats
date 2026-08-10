@@ -20,6 +20,8 @@ export type FeedCheckin = {
   authorAvatarUrl: string | null;
   dateLabel: string;
   createdAt: Date;
+  /** Study time for this session: checkedOutAt - createdAt, minus pausedMs. Same calc as getStudyHoursThisMonth, just per-checkin. */
+  durationMs: number;
   likesCount: number;
   commentsCount: number;
   likedByMe: boolean;
@@ -73,6 +75,7 @@ function toFeedCheckin(
     authorAvatarUrl: c.user.avatarUrl,
     dateLabel: formatDatePtBR(c.createdAt),
     createdAt: c.createdAt,
+    durationMs: c.checkedOutAt!.getTime() - c.createdAt.getTime() - c.pausedMs,
     likesCount: c._count.likes,
     commentsCount: c._count.comments,
     likedByMe: c.likes.length > 0,
