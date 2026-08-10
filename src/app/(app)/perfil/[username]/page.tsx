@@ -83,7 +83,11 @@ export default async function PublicProfilePage({
           size="sm"
           stats={[
             { value: checkinsCount, label: "Check-ins" },
-            { value: friendsCount, label: "Amigos" },
+            {
+              value: friendsCount,
+              label: "Amigos",
+              href: profile.isFullAccess ? `/perfil/${username}/amigos` : undefined,
+            },
             { value: calculateLongestStreak(studyDays), label: "Recorde seguido" },
             {
               value: <GrowingNumber value={hoursThisMonth} decimals={1} suffix="h" />,
