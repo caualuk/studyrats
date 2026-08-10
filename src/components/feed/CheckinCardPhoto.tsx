@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
 import { CheckinCardActions } from "@/components/feed/CheckinCardActions";
 import { CheckinDetailModal } from "@/components/feed/CheckinDetailModal";
-import { formatElapsed } from "@/lib/dates";
+import { formatDuration } from "@/lib/dates";
 import type { FeedCheckin } from "@/lib/checkins/queries";
 
 /**
@@ -46,7 +46,7 @@ export function CheckinCardPhoto({ checkin }: { checkin: FeedCheckin }) {
             )}
           </div>
           <Badge className="absolute bottom-2.5 right-2.5">
-            {formatElapsed(checkin.durationMs)}
+            {formatDuration(checkin.durationMs)}
           </Badge>
           {checkin.canDelete && <CheckinCardActions checkin={checkin} />}
         </PhotoPlaceholder>

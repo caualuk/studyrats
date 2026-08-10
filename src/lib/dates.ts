@@ -194,6 +194,16 @@ export function formatElapsed(ms: number): string {
   return `${hours}h ${String(minutes).padStart(2, "0")}`;
 }
 
+/** "25m" below an hour, "1h 25m" once it crosses one, "1h" exactly on the hour -- for the check-in card's duration badge. */
+export function formatDuration(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
 /** "MM:SS" below an hour, "H:MM:SS" once it crosses one -- ticks down to the second, for the cronometer page/navbar's live stopwatch display. */
 export function formatStopwatch(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
