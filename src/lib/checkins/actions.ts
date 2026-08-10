@@ -7,7 +7,7 @@ import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
 import { canManageChallenge } from "@/lib/challenges/queries";
 import { toDateKey, fromDateKey } from "@/lib/dates";
-import { CheckoutSchema, type FormState } from "@/lib/validations";
+import { CheckoutFieldsSchema, CheckoutSchema, type FormState } from "@/lib/validations";
 
 const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios", "/cronometro"];
 
@@ -179,6 +179,9 @@ export async function checkOutCheckin(
   const validated = CheckoutSchema.safeParse({
     title: formData.get("title"),
     description: formData.get("description"),
+    answeredQuestions: formData.get("answeredQuestions"),
+    questionsTotal: formData.get("questionsTotal"),
+    questionsCorrect: formData.get("questionsCorrect"),
   });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
@@ -212,7 +215,8 @@ export async function checkOutCheckin(
     throw error;
   }
 
-  const { title, description } = validated.data;
+  const { title, description, answeredQuestions, questionsTotal, questionsCorrect } =
+    validated.data;
   // The study day belongs to whichever day the session *started* on, not
   // whenever check-out happened to be clicked.
   const today = toDateKey(checkin.createdAt);
@@ -232,6 +236,8 @@ export async function checkOutCheckin(
           checkedOutAt: new Date(),
           pausedAt: null,
           pausedMs: finalPausedMs,
+          questionsTotal: answeredQuestions === "on" ? Number(questionsTotal) : null,
+          questionsCorrect: answeredQuestions === "on" ? Number(questionsCorrect) : null,
         },
       });
 
@@ -262,7 +268,7 @@ export async function checkOutCheckin(
   return { success: true };
 }
 
-const CheckinEditSchema = CheckoutSchema.pick({ title: true, description: true });
+const CheckinEditSchema = CheckoutFieldsSchema.pick({ title: true, description: true });
 
 /**
  * Edits a completed check-in's content (title, description, optionally its

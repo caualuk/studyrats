@@ -184,6 +184,13 @@ export function startOfMonth(date: Date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+/** `date` shifted by `days` (negative goes backward), same time-of-day. */
+export function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 /** "12min" below an hour, "2h 30" once it crosses one, "1h" exactly on the hour -- for the live check-in timer. */
 export function formatElapsed(ms: number): string {
   const totalMinutes = Math.floor(ms / 60_000);

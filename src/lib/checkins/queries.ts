@@ -220,6 +220,42 @@ export async function getActiveCheckin(userId: string): Promise<ActiveCheckin | 
   });
 }
 
+export type StatsCheckin = {
+  createdAt: Date;
+  /** Study time for this session: checkedOutAt - createdAt, minus pausedMs -- same calc as getStudyHoursThisMonth, kept per-checkin here. */
+  durationMs: number;
+  /** Both null when the "respondeu questões?" flag was off at check-out -- see Checkin.questionsTotal. */
+  questionsTotal: number | null;
+  questionsCorrect: number | null;
+};
+
+/**
+ * Every completed check-in's date, study duration, and (if tracked)
+ * question accuracy -- the raw material for the /estatisticas page. Fetched
+ * in full (not pre-aggregated) so the client can slice by day/week/month
+ * and by an arbitrary picked day without a round-trip per filter change.
+ */
+export async function getUserStatsCheckins(userId: string): Promise<StatsCheckin[]> {
+  const rows = await prisma.checkin.findMany({
+    where: { userId, ...COMPLETED },
+    orderBy: { createdAt: "asc" },
+    select: {
+      createdAt: true,
+      checkedOutAt: true,
+      pausedMs: true,
+      questionsTotal: true,
+      questionsCorrect: true,
+    },
+  });
+
+  return rows.map((r) => ({
+    createdAt: r.createdAt,
+    durationMs: r.checkedOutAt!.getTime() - r.createdAt.getTime() - r.pausedMs,
+    questionsTotal: r.questionsTotal,
+    questionsCorrect: r.questionsCorrect,
+  }));
+}
+
 /** Total hours studied this calendar month, summed from completed check-ins' check-in-to-check-out duration minus any paused time. Drives the profile's "Este mês" stat. */
 export async function getStudyHoursThisMonth(userId: string): Promise<number> {
   const rows = await prisma.checkin.findMany({

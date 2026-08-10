@@ -116,6 +116,11 @@ model Checkin {
   // finalized at check-out if still paused) -- everywhere elapsed/study
   // time is computed, it's (checkedOutAt|now) - createdAt - pausedMs.
   pausedMs    Int      @default(0)
+  // Both null unless the user flagged "respondeu questões?" at check-out --
+  // that's what distinguishes "didn't answer any" (0/0, flag off) from "not
+  // tracked for this check-in" (null) when averaging accuracy in stats.
+  questionsTotal   Int?
+  questionsCorrect Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

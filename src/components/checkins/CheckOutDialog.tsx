@@ -48,6 +48,7 @@ export function CheckOutDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
+  const [answeredQuestions, setAnsweredQuestions] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +183,48 @@ export function CheckOutDialog({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border-strong bg-white/5 px-3 py-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                name="answeredQuestions"
+                checked={answeredQuestions}
+                onChange={(event) => setAnsweredQuestions(event.target.checked)}
+                className="accent-accent"
+              />
+              Respondeu questões nesse check-in?
+            </label>
+
+            {answeredQuestions && (
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                <div>
+                  <Label htmlFor="checkout-questions-total">Quantas respondeu</Label>
+                  <Input
+                    id="checkout-questions-total"
+                    name="questionsTotal"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    placeholder="0"
+                    error={state?.errors?.questionsTotal?.[0]}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="checkout-questions-correct">Quantas acertou</Label>
+                  <Input
+                    id="checkout-questions-correct"
+                    name="questionsCorrect"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    placeholder="0"
+                    error={state?.errors?.questionsCorrect?.[0]}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {state?.message && (
             <p className="text-xs text-red-400" role="alert">

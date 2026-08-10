@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiAward, FiHome, FiTarget, FiUser, FiUsers } from "react-icons/fi";
+import { FiAward, FiBarChart2, FiHome, FiTarget, FiUser, FiUsers } from "react-icons/fi";
 import { cn } from "@/lib/cn";
 
 // `icon` is only rendered by BottomTabBar (the desktop row stays text-only).
@@ -11,6 +11,7 @@ export const TABS = [
   { href: "/ranking", label: "Ranking", icon: FiAward },
   { href: "/desafios", label: "Desafios", icon: FiTarget },
   { href: "/amigos", label: "Amigos", icon: FiUsers },
+  { href: "/estatisticas", label: "Estatísticas", icon: FiBarChart2 },
 ] as const;
 
 // The mobile bottom bar additionally surfaces Perfil as its own quick-access

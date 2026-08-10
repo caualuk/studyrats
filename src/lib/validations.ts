@@ -39,10 +39,50 @@ export type LoginInput = z.infer<typeof LoginSchema>;
 
 // Which challenge (if any) a check-in belongs to is chosen when *starting*
 // it (see startCheckin) -- by check-out time that's already fixed, so this
-// only covers the fields check-out actually collects.
-export const CheckoutSchema = z.object({
+// only covers the fields check-out actually collects. Split into a plain
+// object (CheckoutFieldsSchema) and the refined version (CheckoutSchema)
+// below because editCheckin needs `.pick()` off the former --
+// `.superRefine()` returns a wrapped schema that no longer has `.pick()`.
+export const CheckoutFieldsSchema = z.object({
   title: z.string().trim().min(2, { error: "Dê um título para o check-in." }).max(80),
   description: z.string().trim().max(400).optional().or(z.literal("")),
+  answeredQuestions: z.string().optional(),
+  questionsTotal: z.string().trim().optional(),
+  questionsCorrect: z.string().trim().optional(),
+});
+
+// questionsTotal/questionsCorrect only matter when the "respondeu questões?"
+// checkbox (answeredQuestions) is on -- enforced here (both present,
+// integers, total >= 1, correct <= total) only in that case; left alone
+// (and stored as null) otherwise.
+export const CheckoutSchema = CheckoutFieldsSchema.superRefine((data, ctx) => {
+  if (data.answeredQuestions !== "on") return;
+
+  const total = Number(data.questionsTotal);
+  const totalValid = data.questionsTotal && Number.isInteger(total) && total >= 1;
+  if (!totalValid) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["questionsTotal"],
+      message: "Quantas questões você respondeu?",
+    });
+  }
+
+  const correct = Number(data.questionsCorrect);
+  const correctValid = data.questionsCorrect && Number.isInteger(correct) && correct >= 0;
+  if (!correctValid) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["questionsCorrect"],
+      message: "Quantas você acertou?",
+    });
+  } else if (totalValid && correct > total) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["questionsCorrect"],
+      message: "Não pode ser maior que o total respondido.",
+    });
+  }
 });
 
 export type CheckoutInput = z.infer<typeof CheckoutSchema>;

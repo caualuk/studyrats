@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FiX } from "react-icons/fi";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -35,7 +36,17 @@ export function CheckinDetailModal({
           alt={checkin.title}
           label="foto do check-in"
           className="h-56 w-full rounded-t-2xl"
-        />
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            title="Fechar"
+            className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/85 outline-none transition-colors hover:bg-black/75"
+          >
+            <FiX size={16} />
+          </button>
+        </PhotoPlaceholder>
         <div className="px-6 py-5">
           <div className="mb-2.5 flex items-center gap-2">
             <Link
