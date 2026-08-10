@@ -6,7 +6,6 @@ export type PublicProfile = {
   name: string;
   username: string;
   avatarUrl: string | null;
-  bio: string | null;
   /**
    * False when the profile owner has gone private, the viewer isn't a
    * friend, and the viewer isn't the owner -- the page then shows only
@@ -29,7 +28,7 @@ export async function getProfileByUsername(
 ): Promise<PublicProfile | null> {
   const user = await prisma.user.findUnique({
     where: { username: username.toLowerCase() },
-    select: { id: true, name: true, username: true, avatarUrl: true, bio: true, isPrivate: true },
+    select: { id: true, name: true, username: true, avatarUrl: true, isPrivate: true },
   });
   if (!user) return null;
   if (user.id === viewerId) return { ...user, isFullAccess: true };

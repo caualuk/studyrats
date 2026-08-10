@@ -4,19 +4,15 @@ import { useActionState, useEffect, useState } from "react";
 import { updateProfile } from "@/lib/users/actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Input, Label } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-
-const BIO_MAX_LENGTH = 150;
 
 export function EditProfileDialog({
   name,
   username,
-  bio,
 }: {
   name: string;
   username: string;
-  bio: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -33,7 +29,7 @@ export function EditProfileDialog({
       <Modal open={open} onClose={() => setOpen(false)}>
         <Card className="max-h-[85vh] overflow-y-auto px-6 py-6 text-left">
           <h2 className="mb-4 text-lg font-bold">Editar perfil</h2>
-          <EditProfileForm name={name} username={username} bio={bio} onSaved={() => setOpen(false)} />
+          <EditProfileForm name={name} username={username} onSaved={() => setOpen(false)} />
         </Card>
       </Modal>
     </>
@@ -43,16 +39,13 @@ export function EditProfileDialog({
 export function EditProfileForm({
   name,
   username,
-  bio,
   onSaved,
 }: {
   name: string;
   username: string;
-  bio: string | null;
   onSaved: () => void;
 }) {
   const [state, formAction, pending] = useActionState(updateProfile, undefined);
-  const [length, setLength] = useState(bio?.length ?? 0);
 
   // Notifying the parent (closing the dialog) is a side effect on an
   // external component, not this component's own state, so -- unlike the
@@ -72,23 +65,6 @@ export function EditProfileForm({
       <div>
         <Label htmlFor="username">Usuário</Label>
         <Input id="username" name="username" defaultValue={username} error={state?.errors?.username?.[0]} />
-      </div>
-
-      <div>
-        <Label htmlFor="bio">Bio</Label>
-        <Textarea
-          id="bio"
-          name="bio"
-          rows={3}
-          maxLength={BIO_MAX_LENGTH}
-          defaultValue={bio ?? ""}
-          placeholder="Conte um pouco sobre você e o que está estudando..."
-          error={state?.errors?.bio?.[0]}
-          onChange={(event) => setLength(event.target.value.length)}
-        />
-        <span className="mt-1 block text-right text-[10px] text-white/35">
-          {length}/{BIO_MAX_LENGTH}
-        </span>
       </div>
 
       {state?.message && (

@@ -105,12 +105,6 @@ export type CommentInput = z.infer<typeof CommentSchema>;
 export const UpdateProfileSchema = z.object({
   name: z.string().trim().min(2, { error: "Informe seu nome completo." }),
   username: usernameField,
-  bio: z
-    .string()
-    .trim()
-    .max(150, { error: "Use no máximo 150 caracteres." })
-    .optional()
-    .or(z.literal("")),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;

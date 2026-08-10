@@ -27,7 +27,6 @@ export default async function PerfilPage() {
         name={user.name}
         username={user.username}
         avatarUrl={user.avatarUrl}
-        bio={user.bio}
         streakStatus={streakStatus}
       />
 

@@ -44,18 +44,17 @@ export async function updateProfile(_prevState: FormState, formData: FormData): 
   const validated = UpdateProfileSchema.safeParse({
     name: formData.get("name"),
     username: formData.get("username"),
-    bio: formData.get("bio"),
   });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
   }
 
-  const { name, username, bio } = validated.data;
+  const { name, username } = validated.data;
 
   try {
     await prisma.user.update({
       where: { id: session.userId },
-      data: { name, username: username.toLowerCase(), bio: bio || null },
+      data: { name, username: username.toLowerCase() },
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

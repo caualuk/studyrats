@@ -75,11 +75,6 @@ export default async function PublicProfilePage({
         {profile.isFullAccess && (
           <StreakLine status={streakStatus} subject={profile.name.split(" ")[0]} />
         )}
-        {profile.bio && (
-          <p className="mx-auto mb-3 max-w-sm whitespace-pre-line text-[13px] leading-relaxed text-white/60">
-            {profile.bio}
-          </p>
-        )}
       </div>
 
       <div className="mx-auto max-w-[560px]">
