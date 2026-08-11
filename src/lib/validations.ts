@@ -46,9 +46,16 @@ export type LoginInput = z.infer<typeof LoginSchema>;
 export const CheckoutFieldsSchema = z.object({
   title: z.string().trim().min(2, { error: "Dê um título para o check-in." }).max(80),
   description: z.string().trim().max(400).optional().or(z.literal("")),
-  answeredQuestions: z.string().optional(),
-  questionsTotal: z.string().trim().optional(),
-  questionsCorrect: z.string().trim().optional(),
+  // `.nullish()` (not `.optional()`) on these three: FormData.get() returns
+  // `null` -- not `undefined` -- for a field that isn't in the submitted
+  // form at all, which is exactly what happens for an unchecked checkbox
+  // (answeredQuestions) and for the questionsTotal/questionsCorrect inputs,
+  // which only exist in the DOM while that checkbox is checked. `.optional()`
+  // only accepts `undefined`, so it rejected `null` outright with a generic
+  // "invalid type" error on every check-out that left the checkbox off.
+  answeredQuestions: z.string().nullish(),
+  questionsTotal: z.string().trim().nullish(),
+  questionsCorrect: z.string().trim().nullish(),
 });
 
 // questionsTotal/questionsCorrect only matter when the "respondeu questões?"
