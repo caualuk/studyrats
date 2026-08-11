@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiAward, FiBarChart2, FiHome, FiTarget, FiUser, FiUsers } from "react-icons/fi";
+import { FiAward, FiBarChart2, FiHome, FiTarget, FiUser } from "react-icons/fi";
 import { cn } from "@/lib/cn";
 
 // `icon` is only rendered by BottomTabBar (the desktop row stays text-only).
@@ -10,7 +10,6 @@ export const TABS = [
   { href: "/feed", label: "Feed", icon: FiHome },
   { href: "/ranking", label: "Ranking", icon: FiAward },
   { href: "/desafios", label: "Desafios", icon: FiTarget },
-  { href: "/amigos", label: "Amigos", icon: FiUsers },
   { href: "/estatisticas", label: "Estatísticas", icon: FiBarChart2 },
 ] as const;
 
