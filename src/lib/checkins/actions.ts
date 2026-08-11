@@ -7,7 +7,12 @@ import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
 import { canManageChallenge } from "@/lib/challenges/queries";
 import { toDateKey, fromDateKey } from "@/lib/dates";
-import { CheckoutFieldsSchema, CheckoutSchema, type FormState } from "@/lib/validations";
+import {
+  CheckoutFieldsSchema,
+  CheckoutSchema,
+  questionsIssues,
+  type FormState,
+} from "@/lib/validations";
 
 const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios", "/cronometro"];
 
@@ -268,7 +273,18 @@ export async function checkOutCheckin(
   return { success: true };
 }
 
-const CheckinEditSchema = CheckoutFieldsSchema.pick({ title: true, description: true });
+const CheckinEditFieldsSchema = CheckoutFieldsSchema.pick({
+  title: true,
+  description: true,
+  answeredQuestions: true,
+  questionsTotal: true,
+  questionsCorrect: true,
+});
+const CheckinEditSchema = CheckinEditFieldsSchema.superRefine((data, ctx) => {
+  for (const issue of questionsIssues(data)) {
+    ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
+  }
+});
 
 /**
  * Edits a completed check-in's content (title, description, optionally its
@@ -294,6 +310,9 @@ export async function editCheckin(
   const validated = CheckinEditSchema.safeParse({
     title: formData.get("title"),
     description: formData.get("description"),
+    answeredQuestions: formData.get("answeredQuestions"),
+    questionsTotal: formData.get("questionsTotal"),
+    questionsCorrect: formData.get("questionsCorrect"),
   });
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors as Record<string, string[]> };
@@ -324,7 +343,8 @@ export async function editCheckin(
     }
   }
 
-  const { title, description } = validated.data;
+  const { title, description, answeredQuestions, questionsTotal, questionsCorrect } =
+    validated.data;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -334,6 +354,8 @@ export async function editCheckin(
           title,
           description: description || null,
           ...(photoUrl && { photoUrl }),
+          questionsTotal: answeredQuestions === "on" ? Number(questionsTotal) : null,
+          questionsCorrect: answeredQuestions === "on" ? Number(questionsCorrect) : null,
         },
       });
       await tx.checkinChallenge.deleteMany({ where: { checkinId } });

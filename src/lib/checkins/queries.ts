@@ -22,6 +22,9 @@ export type FeedCheckin = {
   createdAt: Date;
   /** Study time for this session: checkedOutAt - createdAt, minus pausedMs. Same calc as getStudyHoursThisMonth, just per-checkin. */
   durationMs: number;
+  /** Both null when the "respondeu questões?" flag was off at check-out -- see Checkin.questionsTotal. Pre-fills EditCheckinDialog's own copy of that flag. */
+  questionsTotal: number | null;
+  questionsCorrect: number | null;
   likesCount: number;
   commentsCount: number;
   likedByMe: boolean;
@@ -76,6 +79,8 @@ function toFeedCheckin(
     dateLabel: formatDatePtBR(c.createdAt),
     createdAt: c.createdAt,
     durationMs: c.checkedOutAt!.getTime() - c.createdAt.getTime() - c.pausedMs,
+    questionsTotal: c.questionsTotal,
+    questionsCorrect: c.questionsCorrect,
     likesCount: c._count.likes,
     commentsCount: c._count.comments,
     likedByMe: c.likes.length > 0,

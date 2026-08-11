@@ -28,12 +28,33 @@ export function EditCheckinDialog({
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [challenges, setChallenges] = useState<ChallengeOption[] | null>(null);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
+  const [answeredQuestions, setAnsweredQuestions] = useState(checkin.questionsTotal != null);
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  // Guards against re-firing onClose() for a *stale* success: this dialog
+  // stays mounted between opens, so `state` from useActionState keeps
+  // whatever it was left at after the last save -- once a save succeeds,
+  // `state.success` is true forever after. `onClose` itself is a fresh
+  // inline closure from CheckinCardActions on every render, so without this
+  // guard the effect below would re-fire on virtually every re-render (any
+  // time `onClose`'s identity changes) and immediately close a dialog that
+  // was just reopened, before the user ever saw it.
+  const handledSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (state?.success) onClose();
+    if (state?.success && !handledSuccessRef.current) {
+      handledSuccessRef.current = true;
+      onClose();
+    }
   }, [state, onClose]);
+
+  // Declared *after* the effect above so it runs later in the same commit:
+  // resets the guard once the reopen has already been checked against the
+  // stale success, clearing the way for a later genuine save to close the
+  // dialog again.
+  useEffect(() => {
+    if (open) handledSuccessRef.current = false;
+  }, [open]);
 
   useEffect(() => {
     return () => {
@@ -50,7 +71,10 @@ export function EditCheckinDialog({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setSelectedChallengeIds(checkin.challenges.map((c) => c.id));
+    if (open) {
+      setSelectedChallengeIds(checkin.challenges.map((c) => c.id));
+      setAnsweredQuestions(checkin.questionsTotal != null);
+    }
   }
 
   // Fetching the viewer's challenge list, on the other hand, is exactly
@@ -163,6 +187,50 @@ export function EditCheckinDialog({
               </div>
             </div>
           )}
+
+          <div>
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border-strong bg-white/5 px-3 py-2.5 text-xs text-white/70">
+              <input
+                type="checkbox"
+                name="answeredQuestions"
+                checked={answeredQuestions}
+                onChange={(event) => setAnsweredQuestions(event.target.checked)}
+                className="accent-accent"
+              />
+              Respondeu questões nesse check-in?
+            </label>
+
+            {answeredQuestions && (
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                <div>
+                  <Label htmlFor="edit-questions-total">Quantas respondeu</Label>
+                  <Input
+                    id="edit-questions-total"
+                    name="questionsTotal"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    placeholder="0"
+                    defaultValue={checkin.questionsTotal ?? ""}
+                    error={state?.errors?.questionsTotal?.[0]}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-questions-correct">Quantas acertou</Label>
+                  <Input
+                    id="edit-questions-correct"
+                    name="questionsCorrect"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    placeholder="0"
+                    defaultValue={checkin.questionsCorrect ?? ""}
+                    error={state?.errors?.questionsCorrect?.[0]}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {state?.message && (
             <p className="text-xs text-red-400" role="alert">

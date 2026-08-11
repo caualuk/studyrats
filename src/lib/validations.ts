@@ -58,37 +58,48 @@ export const CheckoutFieldsSchema = z.object({
   questionsCorrect: z.string().trim().nullish(),
 });
 
-// questionsTotal/questionsCorrect only matter when the "respondeu questões?"
-// checkbox (answeredQuestions) is on -- enforced here (both present,
-// integers, total >= 1, correct <= total) only in that case; left alone
-// (and stored as null) otherwise.
-export const CheckoutSchema = CheckoutFieldsSchema.superRefine((data, ctx) => {
-  if (data.answeredQuestions !== "on") return;
+/**
+ * Shared by CheckoutSchema below and editCheckin's own schema (see
+ * checkins/actions.ts) -- questionsTotal/questionsCorrect only matter when
+ * the "respondeu questões?" checkbox (answeredQuestions) is on, enforced
+ * here (both present, integers, total >= 1, correct <= total) only in that
+ * case; left alone (and stored as null) otherwise. Returns plain issues
+ * instead of calling `ctx.addIssue` itself so callers can feed it into
+ * whichever schema's `superRefine` they're building, without importing
+ * Zod's internal refinement-context type.
+ */
+export function questionsIssues(data: {
+  answeredQuestions?: string | null;
+  questionsTotal?: string | null;
+  questionsCorrect?: string | null;
+}): { path: "questionsTotal" | "questionsCorrect"; message: string }[] {
+  if (data.answeredQuestions !== "on") return [];
+
+  const issues: { path: "questionsTotal" | "questionsCorrect"; message: string }[] = [];
 
   const total = Number(data.questionsTotal);
   const totalValid = data.questionsTotal && Number.isInteger(total) && total >= 1;
   if (!totalValid) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["questionsTotal"],
-      message: "Quantas questões você respondeu?",
-    });
+    issues.push({ path: "questionsTotal", message: "Quantas questões você respondeu?" });
   }
 
   const correct = Number(data.questionsCorrect);
   const correctValid = data.questionsCorrect && Number.isInteger(correct) && correct >= 0;
   if (!correctValid) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["questionsCorrect"],
-      message: "Quantas você acertou?",
-    });
+    issues.push({ path: "questionsCorrect", message: "Quantas você acertou?" });
   } else if (totalValid && correct > total) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["questionsCorrect"],
+    issues.push({
+      path: "questionsCorrect",
       message: "Não pode ser maior que o total respondido.",
     });
+  }
+
+  return issues;
+}
+
+export const CheckoutSchema = CheckoutFieldsSchema.superRefine((data, ctx) => {
+  for (const issue of questionsIssues(data)) {
+    ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
   }
 });
 
