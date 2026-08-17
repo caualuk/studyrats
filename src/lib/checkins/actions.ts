@@ -6,7 +6,17 @@ import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth/dal";
 import { savePhotoUpload, UploadError } from "@/lib/uploads";
 import { canManageChallenge } from "@/lib/challenges/queries";
+import { canViewFullProfile } from "@/lib/users/queries";
 import { toDateKey, fromDateKey } from "@/lib/dates";
+import {
+  getChallengeCheckinsPage,
+  getFeedCheckinsPage,
+  getUserCheckinsForDay,
+  getUserCheckinsForMonth,
+  getUserCheckinsPage,
+  type CalendarCheckin,
+  type CheckinPage,
+} from "@/lib/checkins/queries";
 import {
   CheckoutFieldsSchema,
   CheckoutSchema,
@@ -18,6 +28,54 @@ const AFFECTED_PATHS = ["/feed", "/100-dias", "/ranking", "/perfil", "/desafios"
 
 function revalidateChallenges(challengeIds: string[]) {
   for (const id of challengeIds) revalidatePath(`/desafios/${id}`);
+}
+
+/**
+ * Read-only server actions backing every "Ver mais" button and the
+ * profile's activity calendar. These are plain data fetches (no
+ * revalidatePath, no redirect), so calling them from a client component
+ * doesn't trigger a re-render of the current route -- just the returned
+ * value comes back. Every one re-derives the caller's identity from the
+ * session and re-checks access itself: these are POST-reachable directly,
+ * not just through the buttons that normally trigger them, so the ids they
+ * take as arguments (challengeId, a profile's userId) can't be trusted on
+ * their own.
+ */
+
+export async function loadMoreFeedCheckins(cursor: string): Promise<CheckinPage> {
+  const session = await verifySession();
+  return getFeedCheckinsPage(session.userId, cursor);
+}
+
+/** No membership check beyond what getChallengeCheckinsPage's join already implies -- challenge check-ins are visible to anyone who can load the challenge page. */
+export async function loadMoreChallengeCheckins(
+  challengeId: string,
+  cursor: string
+): Promise<CheckinPage> {
+  const session = await verifySession();
+  return getChallengeCheckinsPage(challengeId, session.userId, cursor);
+}
+
+export async function loadMoreUserCheckins(userId: string, cursor: string): Promise<CheckinPage> {
+  const session = await verifySession();
+  if (!(await canViewFullProfile(userId, session.userId))) return { items: [], nextCursor: null };
+  return getUserCheckinsPage(userId, session.userId, cursor);
+}
+
+export async function loadCalendarMonth(
+  userId: string,
+  year: number,
+  month: number
+): Promise<CalendarCheckin[]> {
+  const session = await verifySession();
+  if (!(await canViewFullProfile(userId, session.userId))) return [];
+  return getUserCheckinsForMonth(userId, year, month);
+}
+
+export async function loadCheckinsForDay(userId: string, year: number, month: number, day: number) {
+  const session = await verifySession();
+  if (!(await canViewFullProfile(userId, session.userId))) return [];
+  return getUserCheckinsForDay(userId, session.userId, year, month, day);
 }
 
 /**

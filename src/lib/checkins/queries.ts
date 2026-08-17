@@ -89,6 +89,38 @@ function toFeedCheckin(
   };
 }
 
+/** Default page size for every cursor-paginated check-in list below (feed, challenge, profile). */
+export const CHECKIN_PAGE_SIZE = 12;
+
+export type CheckinPage = {
+  items: FeedCheckin[];
+  /** The last item's id, to pass back in as `cursor` for the next page -- null once there's nothing more to load. */
+  nextCursor: string | null;
+};
+
+/**
+ * Runs a findMany for one more row than `limit`, and turns the raw rows plus
+ * that lookahead row into a CheckinPage -- the one bit of bookkeeping shared
+ * by every cursor-paginated query below (feed, challenge, profile). Ordering
+ * must stay `createdAt desc, id desc` (matching every caller here): the
+ * id tiebreaker is what keeps the keyset stable when two check-ins share a
+ * `createdAt`, which a plain `createdAt` cursor alone can't disambiguate.
+ */
+function toPage(
+  checkins: CheckinWithRelations[],
+  limit: number,
+  currentUserId: string,
+  managedChallengeIds: Set<string>,
+  visibleChallengeIds: Set<string>
+): CheckinPage {
+  const hasMore = checkins.length > limit;
+  const page = hasMore ? checkins.slice(0, limit) : checkins;
+  return {
+    items: page.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds, visibleChallengeIds)),
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  };
+}
+
 /**
  * The Feed shows only friends' check-ins -- not the viewer's own, and
  * nothing at all if they have no friends yet. A friend's check-in linked to
@@ -97,17 +129,22 @@ function toFeedCheckin(
  * isn't part of shouldn't leak into their friends' feeds just because
  * they're friends with a member) -- a check-in with no challenge links at
  * all is always visible to friends.
+ *
+ * Cursor-paginated (see toPage): the page component's initial render passes
+ * no cursor, and the "Ver mais" button re-calls this (via a server action)
+ * with the previous page's `nextCursor` to fetch the next batch.
  */
-export async function getFeedCheckins(
+export async function getFeedCheckinsPage(
   currentUserId: string,
-  limit = 30
-): Promise<FeedCheckin[]> {
+  cursor?: string,
+  limit = CHECKIN_PAGE_SIZE
+): Promise<CheckinPage> {
   const friendships = await prisma.friendship.findMany({
     where: { userId: currentUserId },
     select: { friendId: true },
   });
   const friendIds = friendships.map((f) => f.friendId);
-  if (friendIds.length === 0) return [];
+  if (friendIds.length === 0) return { items: [], nextCursor: null };
 
   const myChallengeIds = await getMyChallengeIds(currentUserId);
 
@@ -121,14 +158,15 @@ export async function getFeedCheckins(
           { challenges: { some: { challengeId: { in: [...myChallengeIds] } } } },
         ],
       },
-      orderBy: { createdAt: "desc" },
-      take: limit,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: feedCheckinInclude(currentUserId),
     }),
     getManagedChallengeIds(currentUserId),
   ]);
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds, myChallengeIds));
+  return toPage(checkins, limit, currentUserId, managedChallengeIds, myChallengeIds);
 }
 
 /**
@@ -155,19 +193,76 @@ export async function getUserStudyDays(userId: string): Promise<Date[]> {
 
 /**
  * A user's check-ins, full detail (photo, likes, comments included) --
- * used on the profile page (own or a friend's) for the activity calendar
- * and the per-day check-in list. `viewerId` is separate from `userId`
- * (whose check-ins) so `isOwner`/`likedByMe` reflect the actual viewer on
- * someone else's profile, not the profile owner -- defaults to `userId`
- * for the common case of viewing your own profile.
+ * cursor-paginated (see toPage), used on the profile page (own or a
+ * friend's) for the "últimos check-ins" list below the activity calendar.
+ * `viewerId` is separate from `userId` (whose check-ins) so
+ * `isOwner`/`likedByMe` reflect the actual viewer on someone else's
+ * profile, not the profile owner.
  */
-export async function getUserCheckins(
+export async function getUserCheckinsPage(
   userId: string,
-  viewerId: string = userId
-): Promise<FeedCheckin[]> {
+  viewerId: string,
+  cursor?: string,
+  limit = CHECKIN_PAGE_SIZE
+): Promise<CheckinPage> {
   const [checkins, managedChallengeIds, myChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
       where: { userId, ...COMPLETED },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include: feedCheckinInclude(viewerId),
+    }),
+    getManagedChallengeIds(viewerId),
+    getMyChallengeIds(viewerId),
+  ]);
+
+  return toPage(checkins, limit, viewerId, managedChallengeIds, myChallengeIds);
+}
+
+export type CalendarCheckin = { createdAt: Date; photoUrl: string };
+
+/**
+ * Just enough to paint the activity calendar for one month -- no likes,
+ * comments, or challenge joins, unlike getUserCheckinsPage. Fetched fresh
+ * whenever the calendar's month changes (see ProfileActivity) instead of
+ * requiring the whole check-in history up front, which is what let the
+ * calendar page through arbitrarily old months before pagination existed.
+ */
+export async function getUserCheckinsForMonth(
+  userId: string,
+  year: number,
+  month: number
+): Promise<CalendarCheckin[]> {
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 1);
+  const rows = await prisma.checkin.findMany({
+    where: { userId, ...COMPLETED, createdAt: { gte: start, lt: end } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true, photoUrl: true },
+  });
+  return rows.map((r) => ({ createdAt: r.createdAt, photoUrl: r.photoUrl! }));
+}
+
+/**
+ * Every check-in a user posted on one specific calendar day, full detail --
+ * what the profile's "últimos check-ins" list switches to once a calendar
+ * day is clicked (see ProfileActivity). Not paginated: a single day's worth
+ * of check-ins is small enough not to need it.
+ */
+export async function getUserCheckinsForDay(
+  userId: string,
+  viewerId: string,
+  year: number,
+  month: number,
+  day: number
+): Promise<FeedCheckin[]> {
+  const start = new Date(year, month, day);
+  const end = new Date(year, month, day + 1);
+
+  const [checkins, managedChallengeIds, myChallengeIds] = await Promise.all([
+    prisma.checkin.findMany({
+      where: { userId, ...COMPLETED, createdAt: { gte: start, lt: end } },
       orderBy: { createdAt: "desc" },
       include: feedCheckinInclude(viewerId),
     }),
@@ -179,27 +274,30 @@ export async function getUserCheckins(
 }
 
 /**
- * All check-ins posted under a challenge, used on the challenge detail
- * page. A check-in linked to several challenges shows up on each of their
- * pages -- it's still a single post, just cross-listed (see CheckinChallenge).
+ * All check-ins posted under a challenge, cursor-paginated (see toPage),
+ * used on the challenge detail page. A check-in linked to several
+ * challenges shows up on each of their pages -- it's still a single post,
+ * just cross-listed (see CheckinChallenge).
  */
-export async function getChallengeCheckins(
+export async function getChallengeCheckinsPage(
   challengeId: string,
   currentUserId: string,
-  limit = 60
-): Promise<FeedCheckin[]> {
+  cursor?: string,
+  limit = CHECKIN_PAGE_SIZE
+): Promise<CheckinPage> {
   const [checkins, managedChallengeIds, myChallengeIds] = await Promise.all([
     prisma.checkin.findMany({
       where: { ...COMPLETED, challenges: { some: { challengeId } } },
-      orderBy: { createdAt: "desc" },
-      take: limit,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: feedCheckinInclude(currentUserId),
     }),
     getManagedChallengeIds(currentUserId),
     getMyChallengeIds(currentUserId),
   ]);
 
-  return checkins.map((c) => toFeedCheckin(c, currentUserId, managedChallengeIds, myChallengeIds));
+  return toPage(checkins, limit, currentUserId, managedChallengeIds, myChallengeIds);
 }
 
 export type ActiveCheckin = {

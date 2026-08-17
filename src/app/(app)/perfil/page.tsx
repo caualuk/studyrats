@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/dal";
-import { getStudyHoursThisMonth, getUserCheckins, getUserStudyDays } from "@/lib/checkins/queries";
+import {
+  getStudyHoursThisMonth,
+  getUserCheckinsCount,
+  getUserCheckinsForMonth,
+  getUserCheckinsPage,
+  getUserStudyDays,
+} from "@/lib/checkins/queries";
 import { getFriendsCount } from "@/lib/friends/queries";
 import { calculateLongestStreak, getStreakStatus } from "@/lib/dates";
 import { GrowingNumber } from "@/components/checkins/GrowingNumber";
@@ -12,12 +18,16 @@ export const metadata: Metadata = { title: "Perfil" };
 
 export default async function PerfilPage() {
   const user = await getCurrentUser();
-  const [checkins, studyDays, friendsCount, hoursThisMonth] = await Promise.all([
-    getUserCheckins(user.id),
-    getUserStudyDays(user.id),
-    getFriendsCount(user.id),
-    getStudyHoursThisMonth(user.id),
-  ]);
+  const now = new Date();
+  const [checkinsPage, calendarCheckins, checkinsCount, studyDays, friendsCount, hoursThisMonth] =
+    await Promise.all([
+      getUserCheckinsPage(user.id, user.id, undefined, 6),
+      getUserCheckinsForMonth(user.id, now.getFullYear(), now.getMonth()),
+      getUserCheckinsCount(user.id),
+      getUserStudyDays(user.id),
+      getFriendsCount(user.id),
+      getStudyHoursThisMonth(user.id),
+    ]);
 
   const streakStatus = getStreakStatus(studyDays);
 
@@ -35,7 +45,7 @@ export default async function PerfilPage() {
           className="mb-8"
           size="sm"
           stats={[
-            { value: checkins.length, label: "Check-ins" },
+            { value: checkinsCount, label: "Check-ins" },
             { value: friendsCount, label: "Amigos", href: "/amigos" },
             { value: calculateLongestStreak(studyDays), label: "Recorde seguido" },
             {
@@ -46,7 +56,12 @@ export default async function PerfilPage() {
         />
       </div>
 
-      <ProfileActivity checkins={checkins} />
+      <ProfileActivity
+        userId={user.id}
+        initialCheckins={checkinsPage.items}
+        initialCursor={checkinsPage.nextCursor}
+        initialCalendarCheckins={calendarCheckins}
+      />
     </div>
   );
 }

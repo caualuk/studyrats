@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { getChallengeDetail, getChallengeMembers } from "@/lib/challenges/queries";
-import { getChallengeCheckins } from "@/lib/checkins/queries";
+import { getChallengeCheckinsPage } from "@/lib/checkins/queries";
+import { loadMoreChallengeCheckins } from "@/lib/checkins/actions";
 import type { RankingRow } from "@/lib/ranking/queries";
 import { ChallengeDetailHeader } from "@/components/desafios/ChallengeDetailHeader";
 import { ChallengeParticipants } from "@/components/desafios/ChallengeParticipants";
 import { ChallengePodium, type PodiumMember } from "@/components/desafios/ChallengePodium";
 import { ChallengeRanking } from "@/components/ranking/ChallengeRanking";
-import { CheckinCard } from "@/components/feed/CheckinCard";
+import { CheckinGrid } from "@/components/feed/CheckinGrid";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export const metadata: Metadata = { title: "Desafio" };
@@ -24,10 +25,11 @@ export default async function ChallengeDetailPage({
   const challenge = await getChallengeDetail(id, user.id);
   if (!challenge) notFound();
 
-  const [members, checkins] = await Promise.all([
+  const [members, checkinsPage] = await Promise.all([
     getChallengeMembers(id),
-    getChallengeCheckins(id, user.id),
+    getChallengeCheckinsPage(id, user.id),
   ]);
+  const loadMoreForThisChallenge = loadMoreChallengeCheckins.bind(null, id);
 
   // Metric sort (checkins vs. hours) happens client-side in ChallengeRanking
   // -- both totals are already here, so re-sorting on toggle needs no
@@ -71,18 +73,17 @@ export default async function ChallengeDetailPage({
       <ChallengeRanking rows={rankingRows} />
 
       <h2 className="mb-4 mt-10 text-xl font-bold">Check-ins.</h2>
-      {checkins.length === 0 ? (
-        <EmptyState
-          title="Nenhum check-in por aqui ainda."
-          description="Assim que alguém postar sob esse desafio, aparece nesta lista."
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
-          {checkins.map((checkin) => (
-            <CheckinCard key={checkin.id} checkin={checkin} />
-          ))}
-        </div>
-      )}
+      <CheckinGrid
+        initialItems={checkinsPage.items}
+        initialCursor={checkinsPage.nextCursor}
+        loadMore={loadMoreForThisChallenge}
+        emptyState={
+          <EmptyState
+            title="Nenhum check-in por aqui ainda."
+            description="Assim que alguém postar sob esse desafio, aparece nesta lista."
+          />
+        }
+      />
     </div>
   );
 }

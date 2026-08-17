@@ -5,8 +5,9 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { getProfileByUsername } from "@/lib/users/queries";
 import {
   getStudyHoursThisMonth,
-  getUserCheckins,
   getUserCheckinsCount,
+  getUserCheckinsForMonth,
+  getUserCheckinsPage,
   getUserStudyDays,
 } from "@/lib/checkins/queries";
 import { getFriendsCount } from "@/lib/friends/queries";
@@ -47,16 +48,20 @@ export default async function PublicProfilePage({
   if (!profile) notFound();
   if (profile.id === currentUser.id) redirect("/perfil");
 
-  const [friendsCount, studyDays, hoursThisMonth] = await Promise.all([
+  const now = new Date();
+  const [friendsCount, studyDays, hoursThisMonth, checkinsCount] = await Promise.all([
     getFriendsCount(profile.id),
     getUserStudyDays(profile.id),
     getStudyHoursThisMonth(profile.id),
+    getUserCheckinsCount(profile.id),
   ]);
 
-  const checkins = profile.isFullAccess
-    ? await getUserCheckins(profile.id, currentUser.id)
-    : null;
-  const checkinsCount = checkins ? checkins.length : await getUserCheckinsCount(profile.id);
+  const [checkinsPage, calendarCheckins] = profile.isFullAccess
+    ? await Promise.all([
+        getUserCheckinsPage(profile.id, currentUser.id, undefined, 6),
+        getUserCheckinsForMonth(profile.id, now.getFullYear(), now.getMonth()),
+      ])
+    : [null, null];
 
   const streakStatus = getStreakStatus(studyDays);
 
@@ -98,7 +103,12 @@ export default async function PublicProfilePage({
       </div>
 
       {profile.isFullAccess ? (
-        <ProfileActivity checkins={checkins!} />
+        <ProfileActivity
+          userId={profile.id}
+          initialCheckins={checkinsPage!.items}
+          initialCursor={checkinsPage!.nextCursor}
+          initialCalendarCheckins={calendarCheckins!}
+        />
       ) : (
         <Card className="flex flex-col items-center gap-2 px-6 py-10 text-center">
           <p className="text-sm font-bold text-white">Esse perfil é privado.</p>

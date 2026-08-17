@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/dal";
-import { getActiveCheckin, getFeedCheckins, getUserStudyDays } from "@/lib/checkins/queries";
+import { getActiveCheckin, getFeedCheckinsPage, getUserStudyDays } from "@/lib/checkins/queries";
+import { loadMoreFeedCheckins } from "@/lib/checkins/actions";
 import { getMyFriends } from "@/lib/friends/queries";
 import { getStreakStatus } from "@/lib/dates";
-import { CheckinCard } from "@/components/feed/CheckinCard";
+import { CheckinGrid } from "@/components/feed/CheckinGrid";
 import { StreakBanner } from "@/components/feed/StreakBanner";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -12,8 +13,8 @@ export const metadata: Metadata = { title: "Feed" };
 
 export default async function FeedPage() {
   const user = await getCurrentUser();
-  const [checkins, studyDays, activeCheckin, friends] = await Promise.all([
-    getFeedCheckins(user.id),
+  const [checkinsPage, studyDays, activeCheckin, friends] = await Promise.all([
+    getFeedCheckinsPage(user.id),
     getUserStudyDays(user.id),
     getActiveCheckin(user.id),
     getMyFriends(user.id),
@@ -31,33 +32,32 @@ export default async function FeedPage() {
 
       <h2 className="mb-[18px] text-xl font-bold">Últimos check-ins.</h2>
 
-      {checkins.length === 0 ? (
-        friends.length === 0 ? (
-          <EmptyState
-            title="O feed mostra os check-ins dos seus amigos."
-            description={
-              <>
-                Você ainda não tem amigos por aqui. Adicione alguém no{" "}
-                <Link href="/perfil" className="text-accent hover:underline">
-                  seu perfil
-                </Link>{" "}
-                pra começar a ver os check-ins deles aqui.
-              </>
-            }
-          />
-        ) : (
-          <EmptyState
-            title="Nenhum check-in dos seus amigos ainda."
-            description="Assim que alguém que você segue postar, aparece aqui."
-          />
-        )
-      ) : (
-        <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
-          {checkins.map((checkin) => (
-            <CheckinCard key={checkin.id} checkin={checkin} />
-          ))}
-        </div>
-      )}
+      <CheckinGrid
+        initialItems={checkinsPage.items}
+        initialCursor={checkinsPage.nextCursor}
+        loadMore={loadMoreFeedCheckins}
+        emptyState={
+          friends.length === 0 ? (
+            <EmptyState
+              title="O feed mostra os check-ins dos seus amigos."
+              description={
+                <>
+                  Você ainda não tem amigos por aqui. Adicione alguém no{" "}
+                  <Link href="/perfil" className="text-accent hover:underline">
+                    seu perfil
+                  </Link>{" "}
+                  pra começar a ver os check-ins deles aqui.
+                </>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="Nenhum check-in dos seus amigos ainda."
+              description="Assim que alguém que você segue postar, aparece aqui."
+            />
+          )
+        }
+      />
     </div>
   );
 }

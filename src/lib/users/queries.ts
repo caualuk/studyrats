@@ -31,11 +31,35 @@ export async function getProfileByUsername(
     select: { id: true, name: true, username: true, avatarUrl: true, isPrivate: true },
   });
   if (!user) return null;
-  if (user.id === viewerId) return { ...user, isFullAccess: true };
+
+  const isFullAccess = await canViewFullProfile(user, viewerId);
+  return { ...user, isFullAccess };
+}
+
+/**
+ * Same access rule `getProfileByUsername` derives `isFullAccess` from,
+ * exposed separately so server actions that paginate/lazy-load a profile's
+ * check-in photos (calendar months, "ver mais", a selected day) can
+ * re-check it themselves instead of trusting whatever the client claims --
+ * those actions are POST-reachable directly, not just through this page.
+ * Accepts either a full user row or just its id/isPrivate (the columns this
+ * check actually needs) so callers that only have an id don't need an extra
+ * query first.
+ */
+export async function canViewFullProfile(
+  profileUser: { id: string; isPrivate: boolean } | string,
+  viewerId: string
+): Promise<boolean> {
+  const user =
+    typeof profileUser === "string"
+      ? await prisma.user.findUnique({ where: { id: profileUser }, select: { id: true, isPrivate: true } })
+      : profileUser;
+  if (!user) return false;
+  if (user.id === viewerId) return true;
+  if (!user.isPrivate) return true;
 
   const isFriend = !!(await prisma.friendship.findUnique({
     where: { userId_friendId: { userId: viewerId, friendId: user.id } },
   }));
-
-  return { ...user, isFullAccess: isFriend || !user.isPrivate };
+  return isFriend;
 }
